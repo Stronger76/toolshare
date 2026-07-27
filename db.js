@@ -1,6 +1,9 @@
 const path = require('path');
 const { Pool } = require('pg');
 
+// Bypass self-signed certificate issues for hosted Postgres database connections
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 const isPostgres = !!dbUrl;
 

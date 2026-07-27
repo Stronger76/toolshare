@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+
+// Bypass self-signed certificate issues for hosted Postgres database connections
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const db = require('./db');
 const { dbReady } = require('./db');
 
