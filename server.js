@@ -782,9 +782,11 @@ app.get('/api/rentals/:id/contract', (req, res) => {
       JOIN tools ON rentals.tool_id = tools.id
       JOIN users renters ON rentals.renter_id = renters.id
       JOIN users owners ON tools.owner_id = owners.id
-      WHERE rentals.renter_id = ? AND rentals.start_date = ?
+      WHERE rentals.renter_id = ? 
+        AND rentals.start_date = ? 
+        AND (rentals.status = 'active' OR rentals.id = ?)
     `;
-    db.all(query, [baseRental.renter_id, baseRental.start_date], (err, rows) => {
+    db.all(query, [baseRental.renter_id, baseRental.start_date, rentalId], (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
       if (rows.length === 0) return res.status(404).json({ error: 'Niciun împrumut asociat găsit.' });
 
