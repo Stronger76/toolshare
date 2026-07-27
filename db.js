@@ -129,20 +129,15 @@ if (isPostgres) {
 
       console.log('PostgreSQL tables created successfully.');
 
-      // Seed locations
-      const locCount = await pool.query("SELECT COUNT(*) as count FROM locations");
-      if (parseInt(locCount.rows[0].count) === 0) {
-        // Seed 2 locations
-        // instal / Olecom2026+: 187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81
-        // depozit / Olecom2026: 2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4
-        await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 1', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')");
-        await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 2', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')");
-        console.log('Seeded locations.');
-      } else {
-        // Force update to new credentials in case tables were already created
-        await pool.query("UPDATE locations SET username = 'instal', password = '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81' WHERE id = 1");
-        await pool.query("UPDATE locations SET username = 'depozit', password = '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4' WHERE id = 2");
-      }
+      // Clean and seed locations to ensure exact IDs (1 and 2)
+      await pool.query("DELETE FROM locations");
+      try { await pool.query("ALTER SEQUENCE locations_id_seq RESTART WITH 1"); } catch(e){}
+      
+      // instal / Olecom2026+: 187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81
+      // depozit / Olecom2026: 2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4
+      await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 1', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')");
+      await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 2', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')");
+      console.log('Seeded locations.');
 
       // Assign existing records to default location
       const firstLoc = await pool.query("SELECT id FROM locations ORDER BY id ASC LIMIT 1");
@@ -284,9 +279,9 @@ function initializeSQLiteDatabase() {
     db.run("ALTER TABLE tools ADD COLUMN location_id INTEGER REFERENCES locations(id)", (err) => {});
     db.run("ALTER TABLE rentals ADD COLUMN location_id INTEGER REFERENCES locations(id)", (err) => {});
 
-    // Seed locations in SQLite
-    db.get("SELECT COUNT(*) as count FROM locations", [], (err, row) => {
-      if (row && row.count === 0) {
+    // Clean and seed locations in SQLite to guarantee exact IDs (1 and 2)
+    db.run("DELETE FROM locations", [], () => {
+      db.run("DELETE FROM sqlite_sequence WHERE name='locations'", [], () => {
         db.run("INSERT INTO locations (name, username, password) VALUES ('Telephely 1', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')", () => {
           db.run("INSERT INTO locations (name, username, password) VALUES ('Telephely 2', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')", () => {
             // Assign existing to first location
@@ -300,10 +295,7 @@ function initializeSQLiteDatabase() {
             });
           });
         });
-      } else {
-        db.run("UPDATE locations SET username = 'instal', password = '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81' WHERE id = 1");
-        db.run("UPDATE locations SET username = 'depozit', password = '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4' WHERE id = 2");
-      }
+      });
     });
 
     db.get("SELECT COUNT(*) as count FROM categories", [], (err, row) => {
