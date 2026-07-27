@@ -70,8 +70,8 @@ app.use('/api', async (req, res, next) => {
   try {
     if (dbReady) await dbReady;
     
-    // Auth bypass list
-    if (req.path === '/auth/login' || req.path === '/diag') {
+    // Auth bypass list (loose check for login and diagnostics)
+    if (req.path.includes('auth/login') || req.path.includes('diag')) {
       return next();
     }
 
