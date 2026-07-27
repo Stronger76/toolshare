@@ -1764,48 +1764,62 @@ function setupEventListeners() {
     document.getElementById('tab-btn-dashboard').click();
   });
 
-  userSelect.addEventListener('change', (e) => {
-    selectUser(e.target.value);
-  });
+  if (userSelect) {
+    userSelect.addEventListener('change', (e) => {
+      selectUser(e.target.value);
+    });
+  }
 
-  searchInput.addEventListener('input', debounce(loadTools, 300));
-  filterCategory.addEventListener('change', loadTools);
+  if (searchInput) searchInput.addEventListener('input', debounce(loadTools, 300));
+  if (filterCategory) filterCategory.addEventListener('change', loadTools);
   if (filterStatus) filterStatus.addEventListener('change', loadTools);
   if (filterSort) filterSort.addEventListener('change', loadTools);
 
-  rentStartInput.addEventListener('change', () => {
-    rentEndInput.min = rentStartInput.value;
-    calculateRentCost();
-  });
-  rentEndInput.addEventListener('change', calculateRentCost);
+  if (rentStartInput) {
+    rentStartInput.addEventListener('change', () => {
+      if (rentEndInput) rentEndInput.min = rentStartInput.value;
+      calculateRentCost();
+    });
+  }
+  if (rentEndInput) rentEndInput.addEventListener('change', calculateRentCost);
 
   document.querySelectorAll('.btn-duration').forEach(btn => {
     btn.addEventListener('click', () => {
       const days = parseInt(btn.dataset.days);
-      const startStr = rentStartInput.value || new Date().toISOString().split('T')[0];
+      const startStr = (rentStartInput && rentStartInput.value) || new Date().toISOString().split('T')[0];
       const start = new Date(startStr);
       const end = new Date(start);
       end.setDate(end.getDate() + (days - 1));
-      rentEndInput.value = end.toISOString().split('T')[0];
+      if (rentEndInput) rentEndInput.value = end.toISOString().split('T')[0];
       calculateRentCost();
     });
   });
 
-  btnDepositTrigger.addEventListener('click', () => {
-    modalDeposit.classList.add('active');
-    document.body.classList.add('modal-open');
-  });
-
-  quickAmountBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      depositAmountInput.value = btn.dataset.value;
+  if (btnDepositTrigger) {
+    btnDepositTrigger.addEventListener('click', () => {
+      if (modalDeposit) {
+        modalDeposit.classList.add('active');
+        document.body.classList.add('modal-open');
+      }
     });
-  });
+  }
 
-  btnAddUserTrigger.addEventListener('click', () => {
-    modalAddUser.classList.add('active');
-    document.body.classList.add('modal-open');
-  });
+  if (quickAmountBtns) {
+    quickAmountBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (depositAmountInput) depositAmountInput.value = btn.dataset.value;
+      });
+    });
+  }
+
+  if (btnAddUserTrigger) {
+    btnAddUserTrigger.addEventListener('click', () => {
+      if (modalAddUser) {
+        modalAddUser.classList.add('active');
+        document.body.classList.add('modal-open');
+      }
+    });
+  }
 
   const btnDeleteToolModal = document.getElementById('btn-delete-tool-modal');
   if (btnDeleteToolModal) {
