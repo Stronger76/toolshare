@@ -1269,12 +1269,21 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .user-header-actions {
-    justify-content: space-between;
-    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .user-header-actions .btn {
+    flex: 1 1 auto;
+    font-size: 12px;
+    padding: 8px 12px;
   }
 
   .user-selector-wrapper {
     flex: 1;
+    width: 100%;
   }
 
   .custom-select {
@@ -1285,6 +1294,8 @@ h1, h2, h3, h4, h5, h6 {
 
   .balance-card {
     padding: 6px 12px;
+    width: 100%;
+    justify-content: center;
   }
 
   /* Transform top app-nav to Mobile Native Bottom Nav Bar */
@@ -1300,12 +1311,12 @@ h1, h2, h3, h4, h5, h6 {
     border-left: none;
     border-right: none;
     border-bottom: none;
-    background-color: rgba(19, 27, 46, 0.95);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background-color: var(--bg-surface);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     justify-content: space-around;
     padding: 10px 0;
-    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.2);
     z-index: 99;
   }
 
@@ -1395,6 +1406,11 @@ h1, h2, h3, h4, h5, h6 {
 
   .pwa-banner-actions {
     justify-content: flex-end;
+  }
+
+  .quick-action-btn {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
   }
 }
 
@@ -1765,5 +1781,20 @@ h1, h2, h3, h4, h5, h6 {
 .chrono-time {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* Dashboard Grid Layout & Responsiveness */
+.dashboard-analytics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-analytics-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
 }
 
