@@ -116,18 +116,23 @@ if (isPostgres) {
 
   initializePostgresDatabase();
 } else {
-  const sqlite3 = require('sqlite3').verbose();
-  const dbPath = path.join(__dirname, 'toolshare.db');
-  const sqliteDb = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-      console.error('Error opening database', err.message);
-    } else {
-      console.log('Connected to the SQLite database.');
-      initializeSQLiteDatabase();
-    }
-  });
+  try {
+    const sqlite3 = require(/* webpackIgnore: true */ 'sqlite3').verbose();
+    const dbPath = path.join(__dirname, 'toolshare.db');
+    const sqliteDb = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        console.error('Error opening database', err.message);
+      } else {
+        console.log('Connected to the SQLite database.');
+        initializeSQLiteDatabase();
+      }
+    });
 
-  db = sqliteDb;
+    db = sqliteDb;
+  } catch (e) {
+    console.error('SQLite3 not available. Set POSTGRES_URL or DATABASE_URL for cloud deployment.');
+    process.exit(1);
+  }
 }
 
 function initializePostgresDatabase() {
