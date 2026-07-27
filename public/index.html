@@ -24,6 +24,31 @@
 </head>
 <body>
 
+  <!-- Login Overlay -->
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-box card">
+      <div class="login-logo-area" style="text-align: center;">
+        <svg viewBox="0 0 100 100" fill="none" stroke="#eab308" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" style="width: 60px; height: 60px; margin: 0 auto;">
+          <path d="M20 70l15 15h15l-10-25M35 60l25-25M60 35l15-15a10 10 0 0 1 14 14L75 48M45 50l10 10" />
+          <path d="M75 25l10-10" stroke="#38bdf8" />
+        </svg>
+        <h2 style="font-family: 'Outfit', sans-serif; font-weight: 800; margin-top: 12px; color: #fff;">TOOL<span style="color: var(--accent);">SHARE</span></h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin-top: 4px;">Registru Magazie & Custodie Utilaje</p>
+      </div>
+      <form id="login-form" style="margin-top: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="form-group">
+          <label for="login-username" style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block; color: var(--text-secondary);">Utilizator Telephely</label>
+          <input type="text" id="login-username" class="form-control" placeholder="Pl. locatie1" required style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--border);">
+        </div>
+        <div class="form-group">
+          <label for="login-password" style="font-weight: 600; font-size: 13px; margin-bottom: 6px; display: block; color: var(--text-secondary);">Parolă</label>
+          <input type="password" id="login-password" class="form-control" placeholder="••••" required style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--border);">
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; font-weight: 700; margin-top: 8px;">Intră în Sistem</button>
+      </form>
+    </div>
+  </div>
+
   <!-- App Shell -->
   <div class="app-container">
     
@@ -63,10 +88,10 @@
         </button>
 
         <div class="operator-badge card" style="display: flex; align-items: center; gap: 10px; padding: 8px 16px;">
-          <div class="profile-avatar-sm" style="width: 32px; height: 32px; background: var(--accent); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">A</div>
+          <div class="profile-avatar-sm" id="active-location-avatar" style="width: 32px; height: 32px; background: var(--accent); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">T</div>
           <div style="display: flex; flex-direction: column;">
-            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Admin Magazie</span>
-            <span style="font-size: 11px; color: var(--emerald);">● Operator Activ</span>
+            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);" id="active-location-name">Telephely</span>
+            <span style="font-size: 11px; color: var(--danger); cursor: pointer; font-weight: bold;" id="btn-logout">👋 Kijelentkezés</span>
           </div>
         </div>
       </div>

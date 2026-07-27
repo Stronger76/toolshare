@@ -12,12 +12,83 @@ if ('caches' in window) {
   caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
 }
 
+// Global Fetch Interceptor for Location-based Auth Token
+const originalFetch = window.fetch;
+window.fetch = function(url, options = {}) {
+  const token = localStorage.getItem('toolshare_token');
+  if (token) {
+    options.headers = options.headers || {};
+    options.headers['Authorization'] = `Bearer ${token}`;
+  }
+  return originalFetch(url, options).then(res => {
+    if (res.status === 401 && !url.includes('/api/auth/login')) {
+      logout();
+    }
+    return res;
+  });
+};
+
 // Global Application State
 let users = [];
 let currentUser = null;
 let currentTools = [];
 let selectedTool = null;
 let selectedToolIds = new Set(); // For batch selection
+
+// Login Overlay Elements
+const loginOverlay = document.getElementById('login-overlay');
+const loginForm = document.getElementById('login-form');
+const btnLogout = document.getElementById('btn-logout');
+const activeLocationName = document.getElementById('active-location-name');
+const activeLocationAvatar = document.getElementById('active-location-avatar');
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+
+  try {
+    const res = await originalFetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    localStorage.setItem('toolshare_token', data.token);
+    localStorage.setItem('toolshare_location', JSON.stringify(data.location));
+
+    showToast(`Bun venit la ${data.location.name}!`, 'success');
+    loginOverlay.classList.add('hidden');
+    updateLocationUI();
+    
+    // Load app data
+    await loadCategories();
+    await loadUsers();
+    await loadTools();
+    await loadAdminPanelData();
+    await loadDashboardStats();
+  } catch (err) {
+    showToast(err.message || 'Eroare la autentificare.', 'error');
+  }
+}
+
+function logout() {
+  localStorage.removeItem('toolshare_token');
+  localStorage.removeItem('toolshare_location');
+  localStorage.removeItem('toolshare_user_id');
+  loginOverlay.classList.remove('hidden');
+  showToast('Te-ai deconectat cu succes!', 'info');
+}
+
+function updateLocationUI() {
+  const loc = JSON.parse(localStorage.getItem('toolshare_location'));
+  if (loc) {
+    if (activeLocationName) activeLocationName.textContent = loc.name;
+    if (activeLocationAvatar) activeLocationAvatar.textContent = loc.name.charAt(0).toUpperCase();
+  }
+}
 
 // Utility to group rentals by renter and start date
 function groupRentals(rentalList) {
@@ -175,13 +246,20 @@ if ('serviceWorker' in navigator) {
 // Initialize Application
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
-  setupDateLimits();
-  await loadCategories();
-  await loadUsers();
-  await loadTools();
-  await loadAdminPanelData();
-  await loadDashboardStats();
-  setupPwaInstallPrompt();
+  const token = localStorage.getItem('toolshare_token');
+  if (!token) {
+    if (loginOverlay) loginOverlay.classList.remove('hidden');
+  } else {
+    if (loginOverlay) loginOverlay.classList.add('hidden');
+    updateLocationUI();
+    setupDateLimits();
+    await loadCategories();
+    await loadUsers();
+    await loadTools();
+    await loadAdminPanelData();
+    await loadDashboardStats();
+    setupPwaInstallPrompt();
+  }
 });
 
 // Setup Date Limits (cannot rent in the past)
@@ -1813,6 +1891,9 @@ function setupEventListeners() {
       window.print();
     });
   }
+
+  if (loginForm) loginForm.addEventListener('submit', handleLogin);
+  if (btnLogout) btnLogout.addEventListener('click', logout);
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
