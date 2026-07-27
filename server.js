@@ -63,15 +63,57 @@ app.get('/api/diag', async (req, res) => {
   }
 });
 
+const crypto = require('crypto');
+
 // Wait for database to be ready before handling API requests
 app.use('/api', async (req, res, next) => {
   try {
     if (dbReady) await dbReady;
+    
+    // Auth bypass list
+    if (req.path === '/auth/login' || req.path === '/diag') {
+      return next();
+    }
+
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Logare necesară (Lipsea token).' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token.startsWith('location_token_')) {
+      return res.status(401).json({ error: 'Token invalid.' });
+    }
+
+    const locationId = parseInt(token.replace('location_token_', ''));
+    if (isNaN(locationId)) {
+      return res.status(401).json({ error: 'Token invalid.' });
+    }
+
+    req.locationId = locationId;
     next();
   } catch (err) {
     console.error('DB init middleware error:', err);
     res.status(500).json({ error: 'Database not ready' });
   }
+});
+
+// Authentication endpoint
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Numele de utilizator și parola sunt obligatorii!' });
+  }
+
+  const hash = crypto.createHash('sha256').update(password).digest('hex');
+
+  db.get("SELECT id, name, username FROM locations WHERE LOWER(username) = LOWER(?) AND password = ?", [username.trim(), hash], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(401).json({ error: 'Nume utilizator vagy parolă incorectă!' });
+
+    const token = `location_token_${row.id}`;
+    res.json({ token, location: row });
+  });
 });
 
 // Serve static frontend files
@@ -148,9 +190,9 @@ app.get('/api/tools', (req, res) => {
     SELECT tools.*, users.username as owner_name 
     FROM tools 
     JOIN users ON tools.owner_id = users.id 
-    WHERE 1=1
+    WHERE tools.location_id = ?
   `;
-  const params = [];
+  const params = [req.locationId];
 
   if (category) {
     query += " AND tools.category = ?";
@@ -190,9 +232,9 @@ app.get('/api/tools/:id', (req, res) => {
     SELECT tools.*, users.username as owner_name, users.email as owner_email
     FROM tools 
     JOIN users ON tools.owner_id = users.id 
-    WHERE tools.id = ?
+    WHERE tools.id = ? AND tools.location_id = ?
   `;
-  db.get(query, [req.params.id], (err, row) => {
+  db.get(query, [req.params.id, req.locationId], (err, row) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -220,10 +262,10 @@ app.post('/api/tools', (req, res) => {
   const finalHealth = health_status || 'ok';
   const finalNotes = maintenance_notes || '';
 
-  const query = `INSERT INTO tools (owner_id, name, description, category, price, image_url, status, health_status, maintenance_notes)
-                 VALUES (?, ?, ?, ?, ?, ?, 'available', ?, ?)`;
+  const query = `INSERT INTO tools (owner_id, name, description, category, price, image_url, status, health_status, maintenance_notes, location_id)
+                 VALUES (?, ?, ?, ?, ?, ?, 'available', ?, ?, ?)`;
 
-  db.run(query, [owner_id, name, description, category, finalPrice, finalImageUrl, finalHealth, finalNotes], function(err) {
+  db.run(query, [owner_id, name, description, category, finalPrice, finalImageUrl, finalHealth, finalNotes, req.locationId], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -240,7 +282,7 @@ app.post('/api/tools/:id/rent', (req, res) => {
     return res.status(400).json({ error: 'Date de închiriere incomplete.' });
   }
 
-  db.get("SELECT * FROM tools WHERE id = ?", [toolId], (err, tool) => {
+  db.get("SELECT * FROM tools WHERE id = ? AND location_id = ?", [toolId, req.locationId], (err, tool) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!tool) return res.status(404).json({ error: 'Unealta nu a fost găsită.' });
     if (tool.status !== 'available') return res.status(400).json({ error: 'Unealta este deja împrumutată.' });
@@ -248,7 +290,7 @@ app.post('/api/tools/:id/rent', (req, res) => {
       return res.status(400).json({ error: 'Această unealtă este în szerviz/reparații și nu poate fi preluată!' });
     }
 
-    db.get("SELECT * FROM users WHERE id = ?", [renter_id], (err, renter) => {
+    db.get("SELECT * FROM users WHERE id = ? AND location_id = ?", [renter_id, req.locationId], (err, renter) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!renter) return res.status(404).json({ error: 'Utilizatorul nu a fost găsit.' });
 
@@ -260,18 +302,18 @@ app.post('/api/tools/:id/rent', (req, res) => {
       db.serialize(() => {
         if (numTotalPrice > 0) {
           // 1. Subtract balance from renter
-          db.run("UPDATE users SET balance = balance - ? WHERE id = ?", [numTotalPrice, renter_id]);
+          db.run("UPDATE users SET balance = balance - ? WHERE id = ? AND location_id = ?", [numTotalPrice, renter_id, req.locationId]);
           // 2. Add balance to owner
-          db.run("UPDATE users SET balance = balance + ? WHERE id = ?", [numTotalPrice, tool.owner_id]);
+          db.run("UPDATE users SET balance = balance + ? WHERE id = ? AND location_id = ?", [numTotalPrice, tool.owner_id, req.locationId]);
         }
         
         // 3. Update tool status to rented
-        db.run("UPDATE tools SET status = 'rented' WHERE id = ?", [toolId]);
+        db.run("UPDATE tools SET status = 'rented' WHERE id = ? AND location_id = ?", [toolId, req.locationId]);
         
         // 4. Create rental entry (borrowing log)
         db.run(
-          "INSERT INTO rentals (tool_id, renter_id, start_date, end_date, total_price, status) VALUES (?, ?, ?, ?, ?, 'active')",
-          [toolId, renter_id, start_date, end_date, numTotalPrice],
+          "INSERT INTO rentals (tool_id, renter_id, start_date, end_date, total_price, status, location_id) VALUES (?, ?, ?, ?, ?, 'active', ?)",
+          [toolId, renter_id, start_date, end_date, numTotalPrice, req.locationId],
           function(err) {
             if (err) {
               return res.status(500).json({ error: err.message });
@@ -288,17 +330,17 @@ app.post('/api/tools/:id/rent', (req, res) => {
 app.post('/api/rentals/:id/return', (req, res) => {
   const rentalId = req.params.id;
 
-  db.get("SELECT * FROM rentals WHERE id = ?", [rentalId], (err, rental) => {
+  db.get("SELECT * FROM rentals WHERE id = ? AND location_id = ?", [rentalId, req.locationId], (err, rental) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!rental) return res.status(404).json({ error: 'Tranzacția de împrumut nu a fost găsită.' });
     if (rental.status === 'completed') return res.status(400).json({ error: 'Unealta a fost deja returnată.' });
 
     db.serialize(() => {
       // 1. Complete rental status
-      db.run("UPDATE rentals SET status = 'completed' WHERE id = ?", [rentalId]);
+      db.run("UPDATE rentals SET status = 'completed' WHERE id = ? AND location_id = ?", [rentalId, req.locationId]);
       
       // 2. Make tool available again
-      db.run("UPDATE tools SET status = 'available' WHERE id = ?", [rental.tool_id], (err) => {
+      db.run("UPDATE tools SET status = 'available' WHERE id = ? AND location_id = ?", [rental.tool_id, req.locationId], (err) => {
         if (err) {
           return res.status(500).json({ error: err.message });
         }
@@ -310,7 +352,7 @@ app.post('/api/rentals/:id/return', (req, res) => {
 
 // API - Get all users
 app.get('/api/users', (req, res) => {
-  db.all("SELECT id, username, email, phone, balance, role FROM users", [], (err, rows) => {
+  db.all("SELECT id, username, email, phone, balance, role FROM users WHERE location_id = ?", [req.locationId], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -330,12 +372,12 @@ app.post('/api/users', (req, res) => {
   const userRole = role === 'admin' ? 'admin' : 'user';
   const userPhone = phone || '';
 
-  db.get("SELECT id FROM users WHERE username = ?", [username], (err, row) => {
+  db.get("SELECT id FROM users WHERE username = ? AND location_id = ?", [username, req.locationId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (row) return res.status(400).json({ error: 'Acest nume de utilizator există deja!' });
 
-    const query = `INSERT INTO users (username, email, phone, balance, role) VALUES (?, ?, ?, ?, ?)`;
-    db.run(query, [username, email, userPhone, userBalance, userRole], function(err) {
+    const query = `INSERT INTO users (username, email, phone, balance, role, location_id) VALUES (?, ?, ?, ?, ?, ?)`;
+    db.run(query, [username, email, userPhone, userBalance, userRole, req.locationId], function(err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -357,7 +399,7 @@ app.get('/api/users/:id', (req, res) => {
   const userId = req.params.id;
   const data = {};
 
-  db.get("SELECT id, username, email, balance, role FROM users WHERE id = ?", [userId], (err, user) => {
+  db.get("SELECT id, username, email, balance, role FROM users WHERE id = ? AND location_id = ?", [userId, req.locationId], (err, user) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!user) return res.status(404).json({ error: 'Utilizatorul nu a fost găsit.' });
     
@@ -369,15 +411,15 @@ app.get('/api/users/:id', (req, res) => {
       FROM rentals 
       JOIN tools ON rentals.tool_id = tools.id
       JOIN users ON tools.owner_id = users.id
-      WHERE rentals.renter_id = ?
+      WHERE rentals.renter_id = ? AND rentals.location_id = ?
       ORDER BY rentals.id DESC
     `;
-    db.all(rentalsQuery, [userId], (err, rentals) => {
+    db.all(rentalsQuery, [userId, req.locationId], (err, rentals) => {
       if (err) return res.status(500).json({ error: err.message });
       data.rentals = rentals;
 
       // Get user's listed tools (which they offer for rent)
-      db.all("SELECT * FROM tools WHERE owner_id = ? ORDER BY id DESC", [userId], (err, tools) => {
+      db.all("SELECT * FROM tools WHERE owner_id = ? AND location_id = ? ORDER BY id DESC", [userId, req.locationId], (err, tools) => {
         if (err) return res.status(500).json({ error: err.message });
         data.listedTools = tools;
         
@@ -396,7 +438,7 @@ app.post('/api/users/:id/deposit', (req, res) => {
     return res.status(400).json({ error: 'Sumă nevalidă.' });
   }
 
-  db.run("UPDATE users SET balance = balance + ? WHERE id = ?", [amount, userId], function(err) {
+  db.run("UPDATE users SET balance = balance + ? WHERE id = ? AND location_id = ?", [amount, userId, req.locationId], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -421,30 +463,30 @@ app.get('/api/dashboard/stats', (req, res) => {
   };
 
   db.serialize(() => {
-    db.get("SELECT COUNT(*) as total, SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as available, SUM(CASE WHEN status='rented' THEN 1 ELSE 0 END) as rented FROM tools", [], (err, counts) => {
+    db.get("SELECT COUNT(*) as total, SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) as available, SUM(CASE WHEN status='rented' THEN 1 ELSE 0 END) as rented FROM tools WHERE location_id = ?", [req.locationId], (err, counts) => {
       if (err) return res.status(500).json({ error: err.message });
       stats.totalTools = counts ? (counts.total || 0) : 0;
       stats.availableTools = counts ? (counts.available || 0) : 0;
       stats.rentedTools = counts ? (counts.rented || 0) : 0;
 
-      db.get("SELECT COUNT(*) as overdue FROM rentals WHERE status = 'active' AND end_date < ?", [todayStr], (err, ovRow) => {
+      db.get("SELECT COUNT(*) as overdue FROM rentals WHERE status = 'active' AND end_date < ? AND location_id = ?", [todayStr, req.locationId], (err, ovRow) => {
         if (err) return res.status(500).json({ error: err.message });
         stats.overdueCount = ovRow ? (ovRow.overdue || 0) : 0;
 
         const installerQuery = `
           SELECT users.id, users.username, users.email, COUNT(rentals.id) as active_tools
           FROM users
-          LEFT JOIN rentals ON users.id = rentals.renter_id AND rentals.status = 'active'
-          WHERE users.username != 'Admin'
+          LEFT JOIN rentals ON users.id = rentals.renter_id AND rentals.status = 'active' AND rentals.location_id = ?
+          WHERE users.username != 'Admin' AND users.location_id = ?
           GROUP BY users.id, users.username, users.email
           ORDER BY active_tools DESC
         `;
-        db.all(installerQuery, [], (err, instRows) => {
+        db.all(installerQuery, [req.locationId, req.locationId], (err, instRows) => {
           if (err) return res.status(500).json({ error: err.message });
           stats.totalInstallers = instRows ? instRows.length : 0;
           stats.installerStats = instRows || [];
 
-          db.all("SELECT category, COUNT(*) as count FROM tools GROUP BY category", [], (err, catRows) => {
+          db.all("SELECT category, COUNT(*) as count FROM tools WHERE location_id = ? GROUP BY category", [req.locationId], (err, catRows) => {
             if (err) return res.status(500).json({ error: err.message });
             stats.categoryStats = catRows || [];
 
@@ -457,9 +499,10 @@ app.get('/api/dashboard/stats', (req, res) => {
               FROM rentals
               JOIN tools ON rentals.tool_id = tools.id
               JOIN users ON rentals.renter_id = users.id
+              WHERE rentals.location_id = ?
               ORDER BY rentals.id DESC LIMIT 8
             `;
-            db.all(activityQuery, [], (err, actRows) => {
+            db.all(activityQuery, [req.locationId], (err, actRows) => {
               stats.recentActivity = actRows || [];
               res.json(stats);
             });
@@ -474,7 +517,7 @@ app.get('/api/dashboard/stats', (req, res) => {
 
 // GET /api/categories - Get all categories
 app.get('/api/categories', (req, res) => {
-  db.all("SELECT categories.*, COUNT(tools.id) as tool_count FROM categories LEFT JOIN tools ON categories.name = tools.category GROUP BY categories.id ORDER BY categories.name ASC", [], (err, rows) => {
+  db.all("SELECT categories.*, COUNT(tools.id) as tool_count FROM categories LEFT JOIN tools ON categories.name = tools.category AND tools.location_id = ? GROUP BY categories.id ORDER BY categories.name ASC", [req.locationId], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);
   });
@@ -550,9 +593,10 @@ app.get('/api/admin/rentals', (req, res) => {
     JOIN tools ON rentals.tool_id = tools.id
     JOIN users renters ON rentals.renter_id = renters.id
     JOIN users owners ON tools.owner_id = owners.id
+    WHERE rentals.location_id = ?
     ORDER BY rentals.id DESC
   `;
-  db.all(query, [], (err, rows) => {
+  db.all(query, [req.locationId], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -566,9 +610,10 @@ app.get('/api/admin/tools', (req, res) => {
     SELECT tools.*, users.username as owner_name
     FROM tools
     JOIN users ON tools.owner_id = users.id
+    WHERE tools.location_id = ?
     ORDER BY tools.id DESC
   `;
-  db.all(query, [], (err, rows) => {
+  db.all(query, [req.locationId], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -581,8 +626,8 @@ app.delete('/api/admin/tools/:id', (req, res) => {
   const toolId = req.params.id;
   
   db.serialize(() => {
-    db.run("DELETE FROM rentals WHERE tool_id = ?", [toolId]);
-    db.run("DELETE FROM tools WHERE id = ?", [toolId], function(err) {
+    db.run("DELETE FROM rentals WHERE tool_id = ? AND location_id = ?", [toolId, req.locationId]);
+    db.run("DELETE FROM tools WHERE id = ? AND location_id = ?", [toolId, req.locationId], function(err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -600,7 +645,7 @@ app.post('/api/admin/users/:id/balance', (req, res) => {
     return res.status(400).json({ error: 'Valoare sold nevalidă.' });
   }
 
-  db.run("UPDATE users SET balance = ? WHERE id = ?", [balance, userId], function(err) {
+  db.run("UPDATE users SET balance = ? WHERE id = ? AND location_id = ?", [balance, userId, req.locationId], function(err) {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -612,13 +657,13 @@ app.post('/api/admin/users/:id/balance', (req, res) => {
 app.post('/api/admin/rentals/:id/cancel', (req, res) => {
   const rentalId = req.params.id;
 
-  db.get("SELECT * FROM rentals WHERE id = ?", [rentalId], (err, rental) => {
+  db.get("SELECT * FROM rentals WHERE id = ? AND location_id = ?", [rentalId, req.locationId], (err, rental) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!rental) return res.status(404).json({ error: 'Împrumutul nu există.' });
 
     db.serialize(() => {
-      db.run("UPDATE rentals SET status = 'completed' WHERE id = ?", [rentalId]);
-      db.run("UPDATE tools SET status = 'available' WHERE id = ?", [rental.tool_id], (err) => {
+      db.run("UPDATE rentals SET status = 'completed' WHERE id = ? AND location_id = ?", [rentalId, req.locationId]);
+      db.run("UPDATE tools SET status = 'available' WHERE id = ? AND location_id = ?", [rental.tool_id, req.locationId], (err) => {
         if (err) {
           return res.status(500).json({ error: err.message });
         }
@@ -641,12 +686,12 @@ app.put('/api/admin/users/:id', (req, res) => {
   const userRole = role === 'admin' ? 'admin' : 'user';
   const userPhone = phone || '';
 
-  db.get("SELECT id FROM users WHERE username = ? AND id != ?", [username, userId], (err, row) => {
+  db.get("SELECT id FROM users WHERE username = ? AND id != ? AND location_id = ?", [username, userId, req.locationId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (row) return res.status(400).json({ error: 'Numele de utilizator este folosit de altcineva!' });
 
-    const query = `UPDATE users SET username = ?, email = ?, phone = ?, balance = ?, role = ? WHERE id = ?`;
-    db.run(query, [username, email, userPhone, userBalance, userRole, userId], function(err) {
+    const query = `UPDATE users SET username = ?, email = ?, phone = ?, balance = ?, role = ? WHERE id = ? AND location_id = ?`;
+    db.run(query, [username, email, userPhone, userBalance, userRole, userId, req.locationId], function(err) {
       if (err) {
         return res.status(500).json({ error: err.message });
       }
@@ -660,7 +705,7 @@ app.get('/api/export/csv', (req, res) => {
   const type = req.query.type || 'tools';
 
   if (type === 'tools') {
-    db.all("SELECT tools.*, users.username as owner_name FROM tools JOIN users ON tools.owner_id = users.id", [], (err, rows) => {
+    db.all("SELECT tools.*, users.username as owner_name FROM tools JOIN users ON tools.owner_id = users.id WHERE tools.location_id = ?", [req.locationId], (err, rows) => {
       if (err) return res.status(500).send('Eroare');
       let csv = 'ID,Nume Scula,Categorie,Pret Zi,Status,Stare Szerviz,Proprietar,Descriere\n';
       rows.forEach(r => {
@@ -676,9 +721,10 @@ app.get('/api/export/csv', (req, res) => {
       FROM rentals
       JOIN tools ON rentals.tool_id = tools.id
       JOIN users ON rentals.renter_id = users.id
+      WHERE rentals.location_id = ?
       ORDER BY rentals.id DESC
     `;
-    db.all(query, [], (err, rows) => {
+    db.all(query, [req.locationId], (err, rows) => {
       if (err) return res.status(500).send('Eroare');
       let csv = 'ID,Scula,Instalator Custode,Data Imprumut,Data Retur,Status,Pret Total\n';
       rows.forEach(r => {
@@ -689,7 +735,7 @@ app.get('/api/export/csv', (req, res) => {
       res.status(200).send(csv);
     });
   } else {
-    db.all("SELECT id, username, email, phone, role FROM users", [], (err, rows) => {
+    db.all("SELECT id, username, email, phone, role FROM users WHERE location_id = ?", [req.locationId], (err, rows) => {
       if (err) return res.status(500).send('Eroare');
       let csv = 'ID,Nume Instalator,Email,Telefon,Rol\n';
       rows.forEach(r => {
@@ -706,7 +752,7 @@ app.get('/api/export/csv', (req, res) => {
 app.delete('/api/admin/users/:id', (req, res) => {
   const userId = req.params.id;
 
-  db.get("SELECT * FROM users WHERE id = ?", [userId], (err, user) => {
+  db.get("SELECT * FROM users WHERE id = ? AND location_id = ?", [userId, req.locationId], (err, user) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!user) return res.status(404).json({ error: 'Utilizatorul nu există.' });
     if (user.username === 'Admin') {
@@ -714,10 +760,10 @@ app.delete('/api/admin/users/:id', (req, res) => {
     }
 
     db.serialize(() => {
-      db.run("DELETE FROM rentals WHERE renter_id = ?", [userId]);
-      db.run("DELETE FROM rentals WHERE tool_id IN (SELECT id FROM tools WHERE owner_id = ?)", [userId]);
-      db.run("DELETE FROM tools WHERE owner_id = ?", [userId]);
-      db.run("DELETE FROM users WHERE id = ?", [userId], function(err) {
+      db.run("DELETE FROM rentals WHERE renter_id = ? AND location_id = ?", [userId, req.locationId]);
+      db.run("DELETE FROM rentals WHERE tool_id IN (SELECT id FROM tools WHERE owner_id = ?) AND location_id = ?", [userId, req.locationId]);
+      db.run("DELETE FROM tools WHERE owner_id = ? AND location_id = ?", [userId, req.locationId]);
+      db.run("DELETE FROM users WHERE id = ? AND location_id = ?", [userId, req.locationId], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ message: `Utilizatorul "${user.username}" a fost șters cu succes din sistem!` });
       });
@@ -734,21 +780,21 @@ app.post('/api/rentals/:id/extend', (req, res) => {
     return res.status(400).json({ error: 'Date de prelungire invalide.' });
   }
 
-  db.get("SELECT rentals.*, tools.owner_id FROM rentals JOIN tools ON rentals.tool_id = tools.id WHERE rentals.id = ?", [rentalId], (err, rental) => {
+  db.get("SELECT rentals.*, tools.owner_id FROM rentals JOIN tools ON rentals.tool_id = tools.id WHERE rentals.id = ? AND rentals.location_id = ?", [rentalId, req.locationId], (err, rental) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!rental) return res.status(404).json({ error: 'Împrumutul nu a fost găsit.' });
     if (rental.status !== 'active') return res.status(400).json({ error: 'Doar împrumuturile active pot fi prelungite.' });
 
-    db.get("SELECT balance FROM users WHERE id = ?", [rental.renter_id], (err, renter) => {
+    db.get("SELECT balance FROM users WHERE id = ? AND location_id = ?", [rental.renter_id, req.locationId], (err, renter) => {
       if (err) return res.status(500).json({ error: err.message });
       if (renter.balance < additional_price) {
         return res.status(400).json({ error: 'Sold insuficient pentru prelungirea împrumutului!' });
       }
 
       db.serialize(() => {
-        db.run("UPDATE users SET balance = balance - ? WHERE id = ?", [additional_price, rental.renter_id]);
-        db.run("UPDATE users SET balance = balance + ? WHERE id = ?", [additional_price, rental.owner_id]);
-        db.run("UPDATE rentals SET end_date = ?, total_price = total_price + ? WHERE id = ?", [new_end_date, additional_price, rentalId], function(err) {
+        db.run("UPDATE users SET balance = balance - ? WHERE id = ? AND location_id = ?", [additional_price, rental.renter_id, req.locationId]);
+        db.run("UPDATE users SET balance = balance + ? WHERE id = ? AND location_id = ?", [additional_price, rental.owner_id, req.locationId]);
+        db.run("UPDATE rentals SET end_date = ?, total_price = total_price + ? WHERE id = ? AND location_id = ?", [new_end_date, additional_price, rentalId, req.locationId], function(err) {
           if (err) return res.status(500).json({ error: err.message });
           res.json({ message: `Împrumutul a fost prelungit cu succes până la data de ${new_end_date}!` });
         });
@@ -761,7 +807,7 @@ app.post('/api/rentals/:id/extend', (req, res) => {
 app.get('/api/rentals/:id/contract', (req, res) => {
   const rentalId = req.params.id;
   
-  db.get("SELECT renter_id, start_date FROM rentals WHERE id = ?", [rentalId], (err, baseRental) => {
+  db.get("SELECT renter_id, start_date FROM rentals WHERE id = ? AND location_id = ?", [rentalId, req.locationId], (err, baseRental) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!baseRental) return res.status(404).json({ error: 'Împrumutul nu a fost găsit.' });
 
@@ -785,8 +831,9 @@ app.get('/api/rentals/:id/contract', (req, res) => {
       WHERE rentals.renter_id = ? 
         AND rentals.start_date = ? 
         AND (rentals.status = 'active' OR rentals.id = ?)
+        AND rentals.location_id = ?
     `;
-    db.all(query, [baseRental.renter_id, baseRental.start_date, rentalId], (err, rows) => {
+    db.all(query, [baseRental.renter_id, baseRental.start_date, rentalId, req.locationId], (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
       if (rows.length === 0) return res.status(404).json({ error: 'Niciun împrumut asociat găsit.' });
 
@@ -816,10 +863,10 @@ app.get('/api/rentals/:id/contract', (req, res) => {
 
 // --- BACKUP & RESTORE ENDPOINTS ---
 
-// Export all database tables as a single JSON backup object
+// Export database tables for current location as a single JSON backup object
 app.get('/api/backup/export', (req, res) => {
   const backupData = {
-    version: '1.0',
+    version: '1.1',
     exported_at: new Date().toISOString(),
     users: [],
     tools: [],
@@ -827,15 +874,15 @@ app.get('/api/backup/export', (req, res) => {
   };
 
   db.serialize(() => {
-    db.all("SELECT * FROM users", [], (err, users) => {
+    db.all("SELECT * FROM users WHERE location_id = ?", [req.locationId], (err, users) => {
       if (err) return res.status(500).json({ error: err.message });
       backupData.users = users || [];
 
-      db.all("SELECT * FROM tools", [], (err, tools) => {
+      db.all("SELECT * FROM tools WHERE location_id = ?", [req.locationId], (err, tools) => {
         if (err) return res.status(500).json({ error: err.message });
         backupData.tools = tools || [];
 
-        db.all("SELECT * FROM rentals", [], (err, rentals) => {
+        db.all("SELECT * FROM rentals WHERE location_id = ?", [req.locationId], (err, rentals) => {
           if (err) return res.status(500).json({ error: err.message });
           backupData.rentals = rentals || [];
 
@@ -848,38 +895,88 @@ app.get('/api/backup/export', (req, res) => {
   });
 });
 
-// Import and restore database from JSON backup object
-app.post('/api/backup/import', (req, res) => {
+// Import and restore database from JSON backup object for current location
+app.post('/api/backup/import', async (req, res) => {
   const backup = req.body;
   if (!backup || !backup.users || !backup.tools || !backup.rentals) {
     return res.status(400).json({ error: 'Fișier backup nevalid.' });
   }
 
-  db.serialize(() => {
-    db.run("DELETE FROM rentals");
-    db.run("DELETE FROM tools");
-    db.run("DELETE FROM users");
-
-    const stmtUser = db.prepare("INSERT INTO users (id, username, email, balance, role) VALUES (?, ?, ?, ?, ?)");
-    backup.users.forEach(u => {
-      stmtUser.run(u.id, u.username, u.email, u.balance, u.role);
+  try {
+    // Delete existing data for this location
+    await new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run("DELETE FROM rentals WHERE location_id = ?", [req.locationId]);
+        db.run("DELETE FROM tools WHERE location_id = ?", [req.locationId]);
+        // Do not delete the 'Admin' user for this location if it exists, or just delete non-admin users.
+        // Actually, deleting all users for this location is cleaner.
+        db.run("DELETE FROM users WHERE location_id = ?", [req.locationId], (err) => {
+          if (err) reject(err); else resolve();
+        });
+      });
     });
-    stmtUser.finalize();
 
-    const stmtTool = db.prepare("INSERT INTO tools (id, owner_id, name, description, category, price, image_url, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    backup.tools.forEach(t => {
-      stmtTool.run(t.id, t.owner_id, t.name, t.description, t.category, t.price, t.image_url, t.status);
-    });
-    stmtTool.finalize();
+    const userMap = {};
+    const toolMap = {};
 
-    const stmtRental = db.prepare("INSERT INTO rentals (id, tool_id, renter_id, start_date, end_date, total_price, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    backup.rentals.forEach(r => {
-      stmtRental.run(r.id, r.tool_id, r.renter_id, r.start_date, r.end_date, r.total_price, r.status, r.created_at || new Date().toISOString());
-    });
-    stmtRental.finalize();
+    // 1. Import Users
+    for (const u of backup.users) {
+      // Skip original 'Admin' if it conflicts, but let's just insert users and get new IDs
+      await new Promise((resolve, reject) => {
+        db.run(
+          "INSERT INTO users (username, email, phone, balance, role, location_id) VALUES (?, ?, ?, ?, ?, ?)",
+          [u.username, u.email, u.phone || '', u.balance, u.role, req.locationId],
+          function(err) {
+            if (err) reject(err);
+            else {
+              userMap[u.id] = this.lastID;
+              resolve();
+            }
+          }
+        );
+      });
+    }
 
-    res.json({ message: 'Restaurare backup completată cu succes!' });
-  });
+    // 2. Import Tools
+    for (const t of backup.tools) {
+      const newOwnerId = userMap[t.owner_id] || null;
+      await new Promise((resolve, reject) => {
+        db.run(
+          "INSERT INTO tools (owner_id, name, description, category, price, image_url, status, health_status, maintenance_notes, location_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [newOwnerId, t.name, t.description, t.category, t.price, t.image_url, t.status, t.health_status || 'ok', t.maintenance_notes || '', req.locationId],
+          function(err) {
+            if (err) reject(err);
+            else {
+              toolMap[t.id] = this.lastID;
+              resolve();
+            }
+          }
+        );
+      });
+    }
+
+    // 3. Import Rentals
+    for (const r of backup.rentals) {
+      const newToolId = toolMap[r.tool_id];
+      const newRenterId = userMap[r.renter_id];
+      if (!newToolId || !newRenterId) continue; // skip orphan rentals
+
+      await new Promise((resolve, reject) => {
+        db.run(
+          "INSERT INTO rentals (tool_id, renter_id, start_date, end_date, total_price, status, created_at, location_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [newToolId, newRenterId, r.start_date, r.end_date, r.total_price, r.status, r.created_at || new Date().toISOString(), req.locationId],
+          function(err) {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+    }
+
+    res.json({ message: 'Restaurare backup completată cu succes a telephelyhez!' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Fallback to index.html for SPA router

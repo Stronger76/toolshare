@@ -73,13 +73,21 @@ if (isPostgres) {
   // Async initialization — creates tables and seeds data, resolves when done
   dbReady = (async () => {
     try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS locations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255),
+        username VARCHAR(255) UNIQUE,
+        password VARCHAR(255)
+      )`);
+
       await pool.query(`CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(255) UNIQUE,
         email VARCHAR(255),
         phone VARCHAR(50) DEFAULT '',
         balance DOUBLE PRECISION DEFAULT 200,
-        role VARCHAR(50) DEFAULT 'user'
+        role VARCHAR(50) DEFAULT 'user',
+        location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
       )`);
 
       await pool.query(`CREATE TABLE IF NOT EXISTS tools (
@@ -92,7 +100,8 @@ if (isPostgres) {
         image_url TEXT,
         status VARCHAR(50) DEFAULT 'available',
         health_status VARCHAR(50) DEFAULT 'ok',
-        maintenance_notes TEXT DEFAULT ''
+        maintenance_notes TEXT DEFAULT '',
+        location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
       )`);
 
       await pool.query(`CREATE TABLE IF NOT EXISTS rentals (
@@ -103,7 +112,8 @@ if (isPostgres) {
         end_date VARCHAR(50),
         total_price DOUBLE PRECISION,
         status VARCHAR(50) DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT NOW()
+        created_at TIMESTAMP DEFAULT NOW(),
+        location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL
       )`);
 
       await pool.query(`CREATE TABLE IF NOT EXISTS categories (
@@ -112,7 +122,36 @@ if (isPostgres) {
         icon VARCHAR(255) DEFAULT '/images/default.svg'
       )`);
 
+      // Ensure columns exist on tables for migrations
+      try { await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL`); } catch(e){}
+      try { await pool.query(`ALTER TABLE tools ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL`); } catch(e){}
+      try { await pool.query(`ALTER TABLE rentals ADD COLUMN IF NOT EXISTS location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL`); } catch(e){}
+
       console.log('PostgreSQL tables created successfully.');
+
+      // Seed locations
+      const locCount = await pool.query("SELECT COUNT(*) as count FROM locations");
+      if (parseInt(locCount.rows[0].count) === 0) {
+        // Seed 2 locations
+        // instal / Olecom2026+: 187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81
+        // depozit / Olecom2026: 2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4
+        await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 1', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')");
+        await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 2', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')");
+        console.log('Seeded locations.');
+      } else {
+        // Force update to new credentials in case tables were already created
+        await pool.query("UPDATE locations SET username = 'instal', password = '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81' WHERE id = 1");
+        await pool.query("UPDATE locations SET username = 'depozit', password = '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4' WHERE id = 2");
+      }
+
+      // Assign existing records to default location
+      const firstLoc = await pool.query("SELECT id FROM locations ORDER BY id ASC LIMIT 1");
+      if (firstLoc.rows.length > 0) {
+        const defaultLocId = firstLoc.rows[0].id;
+        await pool.query("UPDATE users SET location_id = $1 WHERE location_id IS NULL", [defaultLocId]);
+        await pool.query("UPDATE tools SET location_id = $1 WHERE location_id IS NULL", [defaultLocId]);
+        await pool.query("UPDATE rentals SET location_id = $1 WHERE location_id IS NULL", [defaultLocId]);
+      }
 
       // Seed categories
       const catCount = await pool.query("SELECT COUNT(*) as count FROM categories");
@@ -186,13 +225,21 @@ if (isPostgres) {
 
 function initializeSQLiteDatabase() {
   db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS locations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      username TEXT UNIQUE,
+      password TEXT
+    )`);
+
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE,
       email TEXT,
       phone TEXT DEFAULT '',
       balance REAL DEFAULT 200,
-      role TEXT DEFAULT 'user'
+      role TEXT DEFAULT 'user',
+      location_id INTEGER REFERENCES locations(id)
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS tools (
@@ -206,6 +253,7 @@ function initializeSQLiteDatabase() {
       status TEXT DEFAULT 'available',
       health_status TEXT DEFAULT 'ok',
       maintenance_notes TEXT DEFAULT '',
+      location_id INTEGER REFERENCES locations(id),
       FOREIGN KEY (owner_id) REFERENCES users(id)
     )`);
 
@@ -218,6 +266,7 @@ function initializeSQLiteDatabase() {
       total_price REAL,
       status TEXT DEFAULT 'active',
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      location_id INTEGER REFERENCES locations(id),
       FOREIGN KEY (tool_id) REFERENCES tools(id),
       FOREIGN KEY (renter_id) REFERENCES users(id)
     )`);
@@ -231,6 +280,31 @@ function initializeSQLiteDatabase() {
     db.run("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''", (err) => {});
     db.run("ALTER TABLE tools ADD COLUMN health_status TEXT DEFAULT 'ok'", (err) => {});
     db.run("ALTER TABLE tools ADD COLUMN maintenance_notes TEXT DEFAULT ''", (err) => {});
+    db.run("ALTER TABLE users ADD COLUMN location_id INTEGER REFERENCES locations(id)", (err) => {});
+    db.run("ALTER TABLE tools ADD COLUMN location_id INTEGER REFERENCES locations(id)", (err) => {});
+    db.run("ALTER TABLE rentals ADD COLUMN location_id INTEGER REFERENCES locations(id)", (err) => {});
+
+    // Seed locations in SQLite
+    db.get("SELECT COUNT(*) as count FROM locations", [], (err, row) => {
+      if (row && row.count === 0) {
+        db.run("INSERT INTO locations (name, username, password) VALUES ('Telephely 1', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')", () => {
+          db.run("INSERT INTO locations (name, username, password) VALUES ('Telephely 2', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')", () => {
+            // Assign existing to first location
+            db.get("SELECT id FROM locations ORDER BY id ASC LIMIT 1", [], (err, locRow) => {
+              if (locRow) {
+                const defaultLocId = locRow.id;
+                db.run("UPDATE users SET location_id = ? WHERE location_id IS NULL", [defaultLocId]);
+                db.run("UPDATE tools SET location_id = ? WHERE location_id IS NULL", [defaultLocId]);
+                db.run("UPDATE rentals SET location_id = ? WHERE location_id IS NULL", [defaultLocId]);
+              }
+            });
+          });
+        });
+      } else {
+        db.run("UPDATE locations SET username = 'instal', password = '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81' WHERE id = 1");
+        db.run("UPDATE locations SET username = 'depozit', password = '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4' WHERE id = 2");
+      }
+    });
 
     db.get("SELECT COUNT(*) as count FROM categories", [], (err, row) => {
       if (row && row.count === 0) {
