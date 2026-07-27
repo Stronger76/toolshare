@@ -135,8 +135,8 @@ if (isPostgres) {
       
       // instal / Olecom2026+: 187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81
       // depozit / Olecom2026: 2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4
-      await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 1', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')");
-      await pool.query("INSERT INTO locations (name, username, password) VALUES ('Telephely 2', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')");
+      await pool.query("INSERT INTO locations (name, username, password) VALUES ('instal', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')");
+      await pool.query("INSERT INTO locations (name, username, password) VALUES ('depozit', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')");
       console.log('Seeded locations.');
 
       // Assign existing records to default location
@@ -282,8 +282,8 @@ function initializeSQLiteDatabase() {
     // Clean and seed locations in SQLite to guarantee exact IDs (1 and 2)
     db.run("DELETE FROM locations", [], () => {
       db.run("DELETE FROM sqlite_sequence WHERE name='locations'", [], () => {
-        db.run("INSERT INTO locations (name, username, password) VALUES ('Telephely 1', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')", () => {
-          db.run("INSERT INTO locations (name, username, password) VALUES ('Telephely 2', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')", () => {
+        db.run("INSERT INTO locations (name, username, password) VALUES ('instal', 'instal', '187f3f71a80329146ff6c0d7f63d39649e158f518e2107b698ad4d30e8911b81')", () => {
+          db.run("INSERT INTO locations (name, username, password) VALUES ('depozit', 'depozit', '2b2d58f56e3a15d4dffbaf3a015b1fc75b4f394f0f371e07d7fea88fdc4b56e4')", () => {
             // Assign existing to first location
             db.get("SELECT id FROM locations ORDER BY id ASC LIMIT 1", [], (err, locRow) => {
               if (locRow) {
