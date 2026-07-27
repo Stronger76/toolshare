@@ -2,12 +2,24 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./db');
+const { dbReady } = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+// Wait for database to be ready before handling API requests
+app.use('/api', async (req, res, next) => {
+  try {
+    if (dbReady) await dbReady;
+    next();
+  } catch (err) {
+    console.error('DB init middleware error:', err);
+    res.status(500).json({ error: 'Database not ready' });
+  }
+});
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, 'public')));
