@@ -10,6 +10,55 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Database Diagnostics Route (helps identify connection issues without checking Vercel logs)
+app.get('/api/diag', async (req, res) => {
+  try {
+    const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+    const isPostgres = !!dbUrl;
+    
+    let dbStatus = "Unknown";
+    let dbError = null;
+    let tables = [];
+
+    if (isPostgres) {
+      const { Pool } = require('pg');
+      const testPool = new Pool({
+        connectionString: dbUrl,
+        ssl: { rejectUnauthorized: false }
+      });
+      try {
+        const result = await testPool.query("SELECT NOW()");
+        dbStatus = "Connected to PostgreSQL successfully!";
+        
+        const tablesResult = await testPool.query(`
+          SELECT table_name 
+          FROM information_schema.tables 
+          WHERE table_schema = 'public'
+        `);
+        tables = tablesResult.rows.map(r => r.table_name);
+      } catch (err) {
+        dbStatus = "Failed to connect to PostgreSQL";
+        dbError = err.message;
+      } finally {
+        await testPool.end();
+      }
+    } else {
+      dbStatus = "Using SQLite fallback";
+    }
+
+    res.json({
+      postgres_detected: isPostgres,
+      postgres_url_present: !!process.env.POSTGRES_URL,
+      database_url_present: !!process.env.DATABASE_URL,
+      status: dbStatus,
+      error: dbError,
+      tables: tables
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Wait for database to be ready before handling API requests
 app.use('/api', async (req, res, next) => {
   try {
