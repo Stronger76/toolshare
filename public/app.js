@@ -54,7 +54,7 @@ function groupRentals(rentalList) {
       g.image_url = g.tools[0].image_url;
       g.tool_name = g.tool_names[0]; // for compatibility
     } else {
-      g.display_name = `${g.tools.length} utilaje (${g.tool_names.join(', ')})`;
+      g.display_name = `${g.tools.length} utilaje`;
       g.image_url = g.tools[0].image_url;
       g.tool_name = g.display_name;
     }
