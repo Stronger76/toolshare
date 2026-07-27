@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    
+    <!-- Accent Gradient -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#eab308" />
+    </linearGradient>
+
+    <!-- Secondary Accent Gradient -->
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+
+    <!-- Shadow Filter -->
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Maskable Safe Area Background -->
+  <rect width="512" height="512" fill="url(#bgGrad)" />
+
+  <!-- Outer Ring -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="url(#cyanGrad)" stroke-width="12" opacity="0.2" />
+  
+  <!-- Outer Dashed Ring -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#accentGrad)" stroke-width="4" stroke-dasharray="15, 10" opacity="0.4" />
+
+  <!-- Tool Symbol Group with Shadow -->
+  <g filter="url(#dropShadow)">
+    <!-- Gear in Background -->
+    <path d="M256,150 L270,120 L290,124 L295,145 L315,155 L335,140 L350,152 L342,175 L355,190 L378,190 L382,210 L362,225 L365,245 L385,256 L385,276 L365,287 L362,307 L382,322 L378,342 L355,342 L342,357 L350,380 L335,392 L315,377 L295,387 L290,408 L270,412 L256,382 L242,412 L222,408 L217,387 L197,377 L177,392 L162,380 L170,357 L157,342 L134,342 L130,322 L150,307 L147,287 L127,276 L127,256 L147,245 L150,225 L130,210 L134,190 L157,190 L170,175 L162,152 L177,140 L197,155 L217,145 L222,124 L242,120 Z" fill="#1e293b" stroke="url(#cyanGrad)" stroke-width="8" stroke-linejoin="round" />
+    <circle cx="256" cy="256" r="60" fill="#0f172a" stroke="url(#cyanGrad)" stroke-width="8" />
+
+    <!-- Stylized Hammer -->
+    <path d="M190,360 L330,220 C340,210 355,210 365,220 L375,230 C385,240 385,255 375,265 L235,405 Z" fill="#334155" stroke="#475569" stroke-width="4" />
+    <path d="M330,220 L310,200 L320,190 L345,200 L370,175 C375,170 385,170 390,175 L400,185 C405,190 405,200 400,205 L375,230 L360,250 Z" fill="url(#accentGrad)" />
+
+    <!-- Stylized Wrench -->
+    <path d="M322,360 L182,220 C172,210 157,210 147,220 L137,230 C127,240 127,255 137,265 L277,405 Z" fill="#475569" stroke="#334155" stroke-width="4" />
+    <!-- Wrench Head -->
+    <path d="M147,220 C130,205 110,180 120,155 C125,145 135,135 150,135 C175,135 195,155 205,170 C210,180 200,195 190,205 L170,215 Z" fill="url(#cyanGrad)" />
+    <!-- Wrench Cutout -->
+    <path d="M135,160 L160,185" stroke="#0f172a" stroke-width="12" stroke-linecap="round" />
+  </g>
+
+  <!-- Title Text -->
+  <text x="256" y="470" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="900" font-size="36" fill="#ffffff" letter-spacing="4">TOOLSHARE</text>
+</svg>

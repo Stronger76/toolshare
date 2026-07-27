@@ -1,0 +1,18 @@
+{
+  "name": "ToolShare Închiriere Scule",
+  "short_name": "ToolShare",
+  "description": "Închiriază, oferă spre închiriere, cumpără sau vinde scule și unelte în mod simplu!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121824",
+  "theme_color": "#eab308",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
