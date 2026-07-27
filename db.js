@@ -34,6 +34,9 @@ if (isPostgres) {
         callback = params;
         params = [];
       }
+      if (!Array.isArray(params)) {
+        params = [];
+      }
       let pgSql = convertSql(sql);
       let isInsert = pgSql.trim().toUpperCase().startsWith('INSERT');
       if (isInsert && !pgSql.toUpperCase().includes('RETURNING')) {
@@ -59,6 +62,9 @@ if (isPostgres) {
         callback = params;
         params = [];
       }
+      if (!Array.isArray(params)) {
+        params = [];
+      }
       const pgSql = convertSql(sql);
       pool.query(pgSql, params, (err, res) => {
         if (err) {
@@ -73,6 +79,9 @@ if (isPostgres) {
     all: function(sql, params, callback) {
       if (typeof params === 'function') {
         callback = params;
+        params = [];
+      }
+      if (!Array.isArray(params)) {
         params = [];
       }
       const pgSql = convertSql(sql);
