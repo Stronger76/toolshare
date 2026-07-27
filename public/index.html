@@ -761,12 +761,34 @@
       </div>
     </div>
 
+    <!-- Floating Batch Rental Action Bar -->
+    <div id="batch-bar" class="batch-bar" style="display: none;">
+      <div class="batch-bar-inner">
+        <div class="batch-bar-count">
+          <span id="batch-count">0</span> utilaj(e) selectate
+        </div>
+        <div class="batch-bar-controls">
+          <select id="batch-installer" class="custom-select batch-select">
+            <!-- Populated dynamically -->
+          </select>
+          <input type="date" id="batch-start" class="batch-date-input">
+          <input type="date" id="batch-end" class="batch-date-input">
+          <button id="btn-batch-rent" class="btn btn-primary batch-btn">
+            🚀 Predă Toate Selectate
+          </button>
+          <button id="btn-batch-cancel" class="btn btn-outline batch-btn-cancel" title="Anulează selecția">
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast Notification System -->
     <div id="toast-container" class="toast-container"></div>
     
   </div>
 
   <!-- Custom JavaScript -->
-  <script src="/app.js?v=15"></script>
+  <script src="/app.js?v=16"></script>
 </body>
 </html>

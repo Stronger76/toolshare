@@ -1798,3 +1798,169 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* ==================== Batch Selection & Floating Bar ==================== */
+
+/* Checkbox overlay on tool cards */
+.tool-card {
+  position: relative;
+}
+.tool-card-checkbox {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
+  font-size: 14px;
+  color: transparent;
+}
+.tool-card-checkbox:hover {
+  border-color: var(--accent);
+  background: rgba(0, 122, 255, 0.08);
+  transform: scale(1.1);
+}
+.tool-card.selected .tool-card-checkbox {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.35);
+}
+.tool-card.selected {
+  outline: 2.5px solid var(--accent);
+  outline-offset: -2px;
+  box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.12), var(--shadow-card);
+}
+
+/* Floating Batch Action Bar */
+.batch-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.1);
+  padding: 12px 20px;
+  animation: slideUpBar 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+@keyframes slideUpBar {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.batch-bar-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.batch-bar-count {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent);
+  white-space: nowrap;
+  min-width: 140px;
+}
+.batch-bar-count span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 800;
+  margin-right: 6px;
+}
+.batch-bar-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+.batch-select {
+  min-width: 200px;
+  max-width: 280px;
+  font-size: 13px;
+  padding: 8px 12px;
+}
+.batch-date-input {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: 13px;
+  color: var(--text-primary);
+  width: 140px;
+}
+.batch-btn {
+  white-space: nowrap;
+  font-weight: 700;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+.batch-btn-cancel {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-color: var(--border);
+  flex-shrink: 0;
+}
+.batch-btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* Quick Return Button in Admin Table */
+.btn-quick-return {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--emerald);
+  border: 1.5px solid var(--emerald);
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+.btn-quick-return:hover {
+  background: var(--emerald);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+}
+
+@media (max-width: 768px) {
+  .batch-bar-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .batch-bar-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .batch-select, .batch-date-input {
+    width: 100%;
+    max-width: 100%;
+  }
+}

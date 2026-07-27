@@ -18,6 +18,7 @@ let currentUser = null;
 let currentTools = [];
 let selectedTool = null;
 let deferredPrompt = null; // For PWA installation
+let selectedToolIds = new Set(); // For batch selection
 
 // DOM Elements
 const userSelect = document.getElementById('user-select');
@@ -277,8 +278,10 @@ function renderTools(tools) {
     
     const card = document.createElement('div');
     card.className = 'tool-card card';
+    if (selectedToolIds.has(tool.id)) card.classList.add('selected');
     
     card.innerHTML = `
+      <div class="tool-card-checkbox" data-select-id="${tool.id}" title="Selectează pentru predare în lot">${selectedToolIds.has(tool.id) ? '✓' : ''}</div>
       <div class="tool-card-header">
         ${badgeHtml}
         <img class="tool-card-img" src="${tool.image_url}" alt="${tool.name}">
@@ -301,6 +304,16 @@ function renderTools(tools) {
         </div>
       </div>
     `;
+
+    // Checkbox click — toggle selection (only for available tools)
+    card.querySelector('.tool-card-checkbox').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (isRented) {
+        showToast('Această sculă este deja împrumutată.', 'error');
+        return;
+      }
+      toggleToolSelection(tool.id, card);
+    });
     
     card.querySelector('.btn-action').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -728,11 +741,12 @@ function renderAdminRentals(rentalList) {
       : `<span class="badge" style="background-color: rgba(255,255,255,0.05); color: var(--text-muted)">Returnată</span>`;
     
     const actionBtns = `
-      <div style="display: flex; gap: 4px;">
+      <div style="display: flex; gap: 4px; flex-wrap: wrap;">
         <button class="btn btn-sm btn-outline btn-admin-contract" data-id="${r.id}" title="Descarcă Proces-Verbal PDF">PDF</button>
         ${isActive ? `
+          <button class="btn btn-sm btn-quick-return btn-admin-quick-return" data-id="${r.id}" title="Returnare rapidă">✅ Visszavettem</button>
           <button class="btn btn-sm btn-outline btn-admin-extend" data-id="${r.id}" data-end="${r.end_date}">Prelungește</button>
-          <button class="btn btn-sm btn-danger btn-admin-cancel" data-id="${r.id}">Forțează Returnare</button>
+          <button class="btn btn-sm btn-danger btn-admin-cancel" data-id="${r.id}">Forțează</button>
         ` : ''}
       </div>
     `;
@@ -753,6 +767,24 @@ function renderAdminRentals(rentalList) {
     });
 
     if (isActive) {
+      // Quick Return — no confirmation, instant action
+      tr.querySelector('.btn-admin-quick-return').addEventListener('click', async (e) => {
+        const btn = e.target;
+        btn.disabled = true;
+        btn.textContent = '⏳...';
+        try {
+          const res = await fetch(`/api/admin/rentals/${r.id}/cancel`, { method: 'POST' });
+          if (!res.ok) throw new Error();
+          showToast(`✅ „${r.tool_name}" visszavéve (${r.renter_name})`, 'success');
+          await loadAdminPanelData();
+          await loadTools();
+        } catch (err) {
+          showToast('Eroare la returnare.', 'error');
+          btn.disabled = false;
+          btn.textContent = '✅ Visszavettem';
+        }
+      });
+
       tr.querySelector('.btn-admin-extend').addEventListener('click', () => {
         openExtendModal(r.id, r.end_date);
       });
@@ -1802,3 +1834,153 @@ function setupPwaInstallPrompt() {
     pwaInstallBanner.classList.add('hidden');
   });
 }
+
+// ==================== BATCH SELECTION & MULTI-RENT LOGIC ====================
+
+function toggleToolSelection(toolId, cardElement) {
+  if (selectedToolIds.has(toolId)) {
+    selectedToolIds.delete(toolId);
+    cardElement.classList.remove('selected');
+    cardElement.querySelector('.tool-card-checkbox').textContent = '';
+  } else {
+    selectedToolIds.add(toolId);
+    cardElement.classList.add('selected');
+    cardElement.querySelector('.tool-card-checkbox').textContent = '✓';
+  }
+  updateBatchBar();
+}
+
+async function updateBatchBar() {
+  const bar = document.getElementById('batch-bar');
+  const countEl = document.getElementById('batch-count');
+  const installerSelect = document.getElementById('batch-installer');
+  const batchStart = document.getElementById('batch-start');
+  const batchEnd = document.getElementById('batch-end');
+
+  if (selectedToolIds.size === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  countEl.textContent = selectedToolIds.size;
+  bar.style.display = 'block';
+
+  // Set default dates (today + 1 day)
+  if (!batchStart.value) {
+    const today = new Date();
+    batchStart.value = today.toISOString().split('T')[0];
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    batchEnd.value = tomorrow.toISOString().split('T')[0];
+  }
+
+  // Populate installer dropdown
+  if (installerSelect.options.length <= 1) {
+    try {
+      const res = await fetch('/api/users');
+      const allUsers = await res.json();
+      installerSelect.innerHTML = '';
+      const installers = allUsers.filter(u => u.username !== 'Admin');
+      installers.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = `👨‍🔧 ${u.username}`;
+        installerSelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('Error loading installers for batch bar:', err);
+    }
+  }
+}
+
+function clearBatchSelection() {
+  selectedToolIds.clear();
+  document.querySelectorAll('.tool-card.selected').forEach(card => {
+    card.classList.remove('selected');
+    const cb = card.querySelector('.tool-card-checkbox');
+    if (cb) cb.textContent = '';
+  });
+  updateBatchBar();
+}
+
+async function batchRent() {
+  const installerSelect = document.getElementById('batch-installer');
+  const batchStart = document.getElementById('batch-start');
+  const batchEnd = document.getElementById('batch-end');
+  const btnBatch = document.getElementById('btn-batch-rent');
+
+  const renter_id = installerSelect.value;
+  const start = batchStart.value;
+  const end = batchEnd.value;
+
+  if (!renter_id) {
+    showToast('Selectează un instalator!', 'error');
+    return;
+  }
+  if (!start || !end) {
+    showToast('Completează datele de început și sfârșit!', 'error');
+    return;
+  }
+  if (new Date(end) < new Date(start)) {
+    showToast('Data de returnare nu poate fi înaintea datei de preluare!', 'error');
+    return;
+  }
+
+  const toolIds = Array.from(selectedToolIds);
+  btnBatch.disabled = true;
+  btnBatch.textContent = `⏳ Se predau ${toolIds.length} utilaje...`;
+
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const toolId of toolIds) {
+    const tool = currentTools.find(t => t.id === toolId);
+    if (!tool || tool.status === 'rented') {
+      failCount++;
+      continue;
+    }
+
+    const startD = new Date(start);
+    const endD = new Date(end);
+    const diffDays = Math.ceil(Math.abs(endD - startD) / (1000 * 60 * 60 * 24)) + 1;
+    const totalPrice = diffDays * tool.price;
+
+    try {
+      const res = await fetch(`/api/tools/${toolId}/rent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          renter_id,
+          start_date: start,
+          end_date: end,
+          total_price: totalPrice
+        })
+      });
+      if (res.ok) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    } catch (err) {
+      failCount++;
+    }
+  }
+
+  if (successCount > 0) {
+    showToast(`✅ ${successCount} utilaj(e) predate cu succes!${failCount > 0 ? ` (${failCount} eșuate)` : ''}`, 'success');
+  } else {
+    showToast('❌ Niciun utilaj nu a putut fi predat.', 'error');
+  }
+
+  clearBatchSelection();
+  btnBatch.disabled = false;
+  btnBatch.textContent = '🚀 Predă Toate Selectate';
+
+  await loadTools();
+  await loadDashboardStats();
+  if (typeof loadAdminPanelData === 'function') await loadAdminPanelData();
+}
+
+// Wire up batch bar buttons
+document.getElementById('btn-batch-rent').addEventListener('click', batchRent);
+document.getElementById('btn-batch-cancel').addEventListener('click', clearBatchSelection);
