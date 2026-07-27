@@ -757,29 +757,58 @@ app.post('/api/rentals/:id/extend', (req, res) => {
   });
 });
 
-// API - Get single rental contract details for printing Proces-Verbal
+// API - Get rental contract details for printing Proces-Verbal (groups same day/renter rentals)
 app.get('/api/rentals/:id/contract', (req, res) => {
   const rentalId = req.params.id;
-  const query = `
-    SELECT rentals.*, 
-           tools.name as tool_name, 
-           tools.category as tool_category, 
-           tools.price as daily_price,
-           tools.description as tool_description,
-           renters.username as renter_name, 
-           renters.email as renter_email,
-           owners.username as owner_name, 
-           owners.email as owner_email
-    FROM rentals
-    JOIN tools ON rentals.tool_id = tools.id
-    JOIN users renters ON rentals.renter_id = renters.id
-    JOIN users owners ON tools.owner_id = owners.id
-    WHERE rentals.id = ?
-  `;
-  db.get(query, [rentalId], (err, row) => {
+  
+  db.get("SELECT renter_id, start_date FROM rentals WHERE id = ?", [rentalId], (err, baseRental) => {
     if (err) return res.status(500).json({ error: err.message });
-    if (!row) return res.status(404).json({ error: 'Împrumutul nu a fost găsit.' });
-    res.json(row);
+    if (!baseRental) return res.status(404).json({ error: 'Împrumutul nu a fost găsit.' });
+
+    const query = `
+      SELECT rentals.id as rental_id,
+             rentals.start_date,
+             rentals.end_date,
+             rentals.total_price,
+             tools.name as tool_name, 
+             tools.category as tool_category, 
+             tools.price as daily_price,
+             tools.description as tool_description,
+             renters.username as renter_name, 
+             renters.email as renter_email,
+             owners.username as owner_name, 
+             owners.email as owner_email
+      FROM rentals
+      JOIN tools ON rentals.tool_id = tools.id
+      JOIN users renters ON rentals.renter_id = renters.id
+      JOIN users owners ON tools.owner_id = owners.id
+      WHERE rentals.renter_id = ? AND rentals.start_date = ?
+    `;
+    db.all(query, [baseRental.renter_id, baseRental.start_date], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (rows.length === 0) return res.status(404).json({ error: 'Niciun împrumut asociat găsit.' });
+
+      const first = rows[0];
+      const totalContractPrice = rows.reduce((sum, r) => sum + r.total_price, 0);
+
+      res.json({
+        id: rentalId,
+        renter_name: first.renter_name,
+        renter_email: first.renter_email,
+        owner_name: first.owner_name,
+        owner_email: first.owner_email,
+        start_date: first.start_date,
+        total_contract_price: totalContractPrice,
+        items: rows.map(r => ({
+          rental_id: r.rental_id,
+          tool_name: r.tool_name,
+          tool_category: r.tool_category,
+          daily_price: r.daily_price,
+          total_price: r.total_price,
+          end_date: r.end_date
+        }))
+      });
+    });
   });
 });
 

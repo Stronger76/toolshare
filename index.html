@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ToolShare - Evidență Împrumut și Închiriere Scule</title>
+  
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Sistem comunitat de evidență a împrumuturilor și închirierilor de unelte și scule. Știi exact cine, când a luat și când trebuie să aducă unealta înapoi.">
+  <meta name="theme-color" content="#eab308">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/style.css?v=14">
+</head>
+<body>
+
+  <!-- App Shell -->
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="logo-area" id="logo-home">
+        <div class="logo-icon-container">
+          <svg class="logo-icon" viewBox="0 0 100 100" fill="none" stroke="#eab308" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 70l15 15h15l-10-25M35 60l25-25M60 35l15-15a10 10 0 0 1 14 14L75 48M45 50l10 10" />
+            <path d="M75 25l10-10" stroke="#38bdf8" />
+          </svg>
+        </div>
+        <div class="logo-text">
+          <span class="logo-title">TOOL<span>SHARE</span></span>
+          <span class="logo-subtitle">Registru Magazie & Custodie Utilaje</span>
+        </div>
+      </div>
+      
+      <!-- Operator Status & Backup Actions -->
+      <div class="user-header-actions" style="display: flex; align-items: center; gap: 10px;">
+        <button id="btn-theme-toggle" class="btn btn-outline" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+          ☀️ Mod Luminos
+        </button>
+
+        <button id="btn-export-csv" class="btn btn-outline" style="border-color: var(--emerald); color: var(--emerald); display: flex; align-items: center; gap: 6px; font-weight: 600;">
+          📊 Export Excel
+        </button>
+
+        <button id="btn-categories-trigger" class="btn btn-outline" style="border-color: var(--accent); color: var(--accent); display: flex; align-items: center; gap: 6px; font-weight: 600;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          🗂️ Categorii
+        </button>
+
+        <button id="btn-backup-trigger" class="btn btn-outline" style="border-color: var(--cyan); color: var(--cyan); display: flex; align-items: center; gap: 6px; font-weight: 600;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          💾 Backup PC
+        </button>
+
+        <div class="operator-badge card" style="display: flex; align-items: center; gap: 10px; padding: 8px 16px;">
+          <div class="profile-avatar-sm" style="width: 32px; height: 32px; background: var(--accent); color: #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">A</div>
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Admin Magazie</span>
+            <span style="font-size: 11px; color: var(--emerald);">● Operator Activ</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- PWA Install Banner -->
+    <div id="pwa-install-banner" class="pwa-banner hidden">
+      <div class="pwa-banner-content">
+        <span class="pwa-banner-title">Instalează aplicația Registru Magazie!</span>
+        <span class="pwa-banner-desc">Accesează registrul de utilaje direct de pe ecranul mobil.</span>
+      </div>
+      <div class="pwa-banner-actions">
+        <button id="btn-pwa-install" class="btn btn-primary btn-sm">Instalează</button>
+        <button id="btn-pwa-close" class="btn btn-text btn-sm">Mai târziu</button>
+      </div>
+    </div>
+
+    <!-- Main Navigation Bar (Tab Buttons) -->
+    <nav class="app-nav">
+      <button class="nav-tab active" data-target="tab-dashboard" id="tab-btn-dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard & Statistici</span>
+      </button>
+
+      <button class="nav-tab" data-target="tab-browse" id="tab-btn-browse">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <span>Catalog Utilaje</span>
+      </button>
+
+      <button class="nav-tab" data-target="tab-rentals" id="tab-btn-rentals">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Evidență Predări (Care la cine)</span>
+      </button>
+      
+      <button class="nav-tab" data-target="tab-installers" id="tab-btn-installers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Registru Instalatori</span>
+      </button>
+
+      <button class="nav-tab" data-target="tab-list" id="tab-btn-list">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        <span>Adaugă Utilaj</span>
+      </button>
+    </nav>
+
+    <!-- Main Application Viewports -->
+    <main class="app-main">
+
+      <!-- Tab 1: Executive Dashboard & Stats -->
+      <section id="tab-dashboard" class="tab-content active">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+          <div>
+            <h2 class="section-title" style="margin: 0;">Tablou de Comandă Magazie</h2>
+            <p class="form-subtitle" style="margin: 4px 0 0 0;">Centru operativ în timp real: stocuri, instalatori pe teren și istoric mișcări.</p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="text" id="db-quick-search" placeholder="🔍 Căutare rapidă..." style="padding: 8px 14px; border-radius: 50px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); font-size: 13px; color: var(--text-primary); width: 220px;">
+          </div>
+        </div>
+
+        <!-- Quick Action Hub -->
+        <div class="quick-action-hub">
+          <button id="qa-rent-tool" class="quick-action-btn" style="border-color: var(--accent); color: var(--accent);">
+            ⚡ Predare Rapidă Utilaj
+          </button>
+          <button id="qa-add-tool" class="quick-action-btn">
+            ➕ Adaugă Utilaj Nou
+          </button>
+          <button id="qa-add-installer" class="quick-action-btn">
+            👨‍🔧 Înregistrează Instalator
+          </button>
+          <button id="qa-categories" class="quick-action-btn">
+            🗂️ Gestiune Categorii
+          </button>
+        </div>
+
+        <!-- KPI Cards Grid -->
+        <div class="kpi-grid">
+          <div class="kpi-card card">
+            <div class="kpi-icon-box yellow">🧰</div>
+            <div class="kpi-text">
+              <span class="kpi-val" id="db-stat-total">0</span>
+              <span class="kpi-lbl">Total Utilaje în Inventar</span>
+            </div>
+          </div>
+
+          <div class="kpi-card card">
+            <div class="kpi-icon-box green"><span class="dot-pulse dot-green"></span> 🟢</div>
+            <div class="kpi-text">
+              <span class="kpi-val" id="db-stat-available">0</span>
+              <span class="kpi-lbl">Disponibile în Magazie</span>
+            </div>
+          </div>
+
+          <div class="kpi-card card">
+            <div class="kpi-icon-box red"><span class="dot-pulse dot-red"></span> 🔴</div>
+            <div class="kpi-text">
+              <span class="kpi-val" id="db-stat-rented">0</span>
+              <span class="kpi-lbl">Predate pe Teren</span>
+            </div>
+          </div>
+
+          <div class="kpi-card card">
+            <div class="kpi-icon-box orange"><span class="dot-pulse dot-amber"></span> ⚠️</div>
+            <div class="kpi-text">
+              <span class="kpi-val" id="db-stat-overdue">0</span>
+              <span class="kpi-lbl">Retur Depășit</span>
+            </div>
+          </div>
+
+          <div class="kpi-card card">
+            <div class="kpi-icon-box cyan">👨‍🔧</div>
+            <div class="kpi-text">
+              <span class="kpi-val" id="db-stat-installers">0</span>
+              <span class="kpi-lbl">Instalatori Înregistrați</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Warehouse Utilization Progress Indicator -->
+        <div class="card" style="margin-top: 16px; padding: 16px 20px; background: rgba(255,255,255,0.02);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Rată de Utilizare Echipamente pe Teren</span>
+            <span id="db-utilization-text" style="font-size: 14px; font-weight: 800; color: var(--cyan);">0% grad de ocupare</span>
+          </div>
+          <div class="progress-bar-container" style="height: 10px;">
+            <div id="db-utilization-bar" class="progress-bar-fill" style="width: 0%; background: linear-gradient(90deg, var(--cyan), var(--accent));"></div>
+          </div>
+        </div>
+
+        <!-- Category Chips -->
+        <div style="margin-top: 20px;">
+          <span style="font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">Filtrare Rapidă pe Categorie:</span>
+          <div id="db-category-chips" class="category-chips-wrapper">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Dashboard Multi-Column Layout -->
+        <div class="dashboard-analytics-grid">
+          <!-- Left Column: Custody Breakdown & Overdues -->
+          <div style="display: flex; flex-direction: column; gap: 24px;">
+            <div class="card">
+              <h3 class="card-title" style="border-left-color: var(--cyan);">Utilaje pe Teren per Instalator</h3>
+              <div id="db-installer-breakdown" class="breakdown-list" style="margin-top: 16px;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+
+            <div class="card">
+              <h3 class="card-title" style="border-left-color: var(--danger);">Avertismente Retur Depășit</h3>
+              <div id="db-overdue-list" class="overdue-list" style="margin-top: 16px;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column: Chrono-Log Activity Feed -->
+          <div class="card">
+            <h3 class="card-title" style="border-left-color: var(--accent);">🕒 Chrono-Log: Istoric Activitate Recentă</h3>
+            <div id="db-chrono-feed" class="chrono-log-list" style="margin-top: 16px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Tab 2: Catalog Utilaje -->
+      <section id="tab-browse" class="tab-content">
+        <!-- Search and Filters bar -->
+        <div class="search-filter-section">
+          <div class="search-box">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" id="search-input" placeholder="Caută bormașină, flex, mașină de tuns iarba, chei...">
+          </div>
+          
+          <div class="filter-controls">
+            <div class="filter-group">
+              <label for="filter-category">Categorie unealtă</label>
+              <select id="filter-category" class="custom-select">
+                <option value="">Toate categoriile</option>
+                <option value="Scule electrice">Scule electrice</option>
+                <option value="Unelte de mână">Unelte de mână</option>
+                <option value="Scule pentru grădină">Scule pentru grădină</option>
+                <option value="Instrumente de măsură">Instrumente de măsură</option>
+                <option value="Altele">Altele</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="filter-status">Status unealtă</label>
+              <select id="filter-status" class="custom-select">
+                <option value="">Toate statusurile</option>
+                <option value="available">Doar În Magazie (Disponibile)</option>
+                <option value="rented">Doar Pe Teren (Predate)</option>
+              </select>
+            </div>
+
+            <div class="filter-group">
+              <label for="filter-sort">Sortare preț</label>
+              <select id="filter-sort" class="custom-select">
+                <option value="newest">Cele mai noi</option>
+                <option value="price_asc">Preț: Mic -> Mare</option>
+                <option value="price_desc">Preț: Mare -> Mic</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tool Cards Grid -->
+        <div class="grid-section">
+          <h2 class="section-title">Catalog general echipamente & scule</h2>
+          <div id="tools-grid" class="tools-grid">
+            <!-- Cards populated dynamically -->
+            <div class="loading-spinner"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 3: Evidență Predări / Custodie -->
+      <section id="tab-rentals" class="tab-content">
+        <h2 class="section-title">Evidență Generală Împrumuturi & Custodie (Care utilaj la cine este)</h2>
+        <p class="form-subtitle" style="margin-bottom: 24px;">Registrul central cu fiecare predare: cine este custodele, când a luat utilajul și când urmează să îl returneze.</p>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Utilaj Predat</th>
+                  <th>Instalator / Custode</th>
+                  <th>Data Predării</th>
+                  <th>Data Est. Returnare</th>
+                  <th>Status Predare</th>
+                  <th>Acțiuni Admin</th>
+                </tr>
+              </thead>
+              <tbody id="admin-rentals-table">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Master Tools Inventory Management -->
+        <h2 class="section-title" style="margin-top: 32px;">Inventar General Magazie (Modificare & Șterge Utilaje)</h2>
+        <div class="card">
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Denumire Utilaj</th>
+                  <th>Proprietar / Operator</th>
+                  <th>Categorie</th>
+                  <th>Tarif pe zi</th>
+                  <th>Status Curent</th>
+                  <th>Șterge Utilaj</th>
+                </tr>
+              </thead>
+              <tbody id="admin-tools-table">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 4: Registru Instalatori -->
+      <section id="tab-installers" class="tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <h2 class="section-title" style="margin: 0;">Registru Instalatori & Echipă</h2>
+            <p class="form-subtitle" style="margin: 4px 0 0 0;">Lista instalatorilor și numărul de utilaje aflate în custodia fiecăruia.</p>
+          </div>
+          <button id="btn-add-installer-page" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; margin-right: 6px;"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/></svg>
+            Adaugă Instalator Nou
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Nume Instalator / Tehnician</th>
+                  <th>Email / Contact</th>
+                  <th>Rol</th>
+                  <th>Scule în Custodie Activă</th>
+                  <th>Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody id="admin-users-table">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 5: List Tool Form -->
+      <section id="tab-list" class="tab-content">
+        <div class="form-container card">
+          <h2 class="form-title">Adaugă un utilaj nou în magazie</h2>
+          <p class="form-subtitle">Înregistrează un echipament nou în stocul magaziei pentru a-l putea preda instalatorilor.</p>
+          
+          <form id="list-tool-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="tool-name">Denumire unealtă / utilaj *</label>
+                <input type="text" id="tool-name" required placeholder="Ex: Ciocan rotopercutor Bosch 800W">
+              </div>
+
+              <div class="form-group">
+                <label for="tool-category">Categorie *</label>
+                <select id="tool-category" class="custom-select" required>
+                  <option value="" disabled selected>Alege categoria</option>
+                  <option value="Scule electrice">Scule electrice</option>
+                  <option value="Unelte de mână">Unelte de mână</option>
+                  <option value="Scule pentru grădină">Scule pentru grădină</option>
+                  <option value="Instrumente de măsură">Instrumente de măsură</option>
+                  <option value="Altele">Altele</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="tool-price">Tarif pe zi (RON) <small style="color: var(--cyan); font-weight: normal;">(Setează 0 pentru scule date în folosință gratuită)</small> *</label>
+                <input type="number" id="tool-price" min="0" value="0" step="5" required placeholder="0">
+              </div>
+
+              <div class="form-group">
+                <label for="tool-image">Imagine / Icoană unealtă *</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <select id="tool-image" class="custom-select" style="flex: 1;">
+                    <option value="/images/drill.svg">🔨 Bormașină / Rotopercutor</option>
+                    <option value="/images/lawnmower.svg">🚜 Mașină tuns iarba</option>
+                    <option value="/images/grinder.svg">🪚 Polizor unghiular / Flex</option>
+                    <option value="/images/toolbox.svg">🧰 Trusă de scule / Chei</option>
+                    <option value="/images/washer.svg">💦 Aparat spălat cu presiune</option>
+                    <option value="/images/generator.svg">⚡ Generator electric</option>
+                    <option value="/images/screwdriver.svg">🪛 Șurubelniță electrică</option>
+                    <option value="/images/laser.svg">📐 Instrument măsurat / Laser</option>
+                    <option value="/images/default.svg">🧰 Icoană standard</option>
+                  </select>
+                  <div id="icon-preview-box" style="width: 44px; height: 44px; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 4px; flex-shrink: 0;">
+                    <img id="icon-preview-img" src="/images/drill.svg" style="width: 100%; height: 100%; object-fit: contain;">
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="tool-health-status">🛠️ Stare Szerviz / Revizie *</label>
+                <select id="tool-health-status" class="custom-select">
+                  <option value="ok" selected>🟢 Funcțional (Gata de predare)</option>
+                  <option value="maintenance">🛠️ În Szerviz / Revizie (Blocat de la predare)</option>
+                  <option value="broken">🔴 Defect / Reparații Necesare</option>
+                </select>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="tool-description">Descriere și accesorii *</label>
+                <textarea id="tool-description" rows="3" required placeholder="Introduceți seria utilajului, valiza de transport sau accesoriile incluse..."></textarea>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="tool-maintenance-notes">Jurnal Szerviz / Observații Tehnice</label>
+                <input type="text" id="tool-maintenance-notes" placeholder="Ex: Schimbat ulei pe 15 Iul, perii noi rotopercutor...">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary btn-block">Înregistrează utilajul în magazie</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Dialog / Modals System -->
+    
+    <!-- 1. Tool Details & Action Modal -->
+    <div id="modal-tool-detail" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper">
+        <div class="modal-header">
+          <h3 class="modal-title" id="md-title">Detalii unealtă & Rezervare împrumut</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-tool-info">
+            <div class="modal-tool-img-container">
+              <img id="md-img" src="/images/default.svg" alt="Imagine unealtă">
+            </div>
+            <div class="modal-tool-text">
+              <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
+                <div class="badge badge-accent" id="md-category">Categorie</div>
+                <div class="badge" id="md-health-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--emerald); font-weight: 700;">🟢 Funcțional</div>
+              </div>
+              <h2 id="md-name">Denumire unealtă</h2>
+              <div class="tool-owner-tag">Proprietar: <span id="md-owner">Admin</span></div>
+              <div class="tool-price-tag" id="md-price">50 RON / zi</div>
+              <p class="tool-desc" id="md-desc">Descrierea detaliată a uneltei va apărea aici.</p>
+              
+              <!-- QR Code Card -->
+              <div id="md-qr-box" style="margin-top: 12px; display: flex; align-items: center; gap: 12px; background: rgba(0,0,0,0.04); padding: 10px; border-radius: 12px; border: 1px solid var(--border);">
+                <img id="md-qr-img" src="" alt="QR Code Sculă" style="width: 64px; height: 64px; border-radius: 6px; background: #fff; padding: 2px;">
+                <div style="font-size: 12px; color: var(--text-secondary);">
+                  <strong style="color: var(--text-primary); display: block;">Cod QR Unic Identificare Sculă</strong>
+                  Scanează codul QR de pe fișă pentru deschidere rapidă.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rent Form Segment -->
+          <div id="md-rent-segment" class="action-segment card">
+            <h4 class="segment-title">Selectează persoana și perioada împrumutului</h4>
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label for="rent-client-select">Persoana care împrumută (Chiriaș / Client) *</label>
+              <select id="rent-client-select" class="custom-select">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div class="date-inputs">
+              <div class="form-group">
+                <label for="rent-start">Data luării (Când o iei)</label>
+                <input type="date" id="rent-start">
+              </div>
+              <div class="form-group">
+                <label for="rent-end">Data returnării (Când o aduci înapoi)</label>
+                <input type="date" id="rent-end">
+              </div>
+            </div>
+
+            <div class="quick-duration-btns" style="display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+              <span style="font-size: 12px; color: var(--text-muted); width: 100%; margin-bottom: 2px;">Durată rapidă:</span>
+              <button type="button" class="btn btn-sm btn-outline btn-duration" data-days="1">1 zi</button>
+              <button type="button" class="btn btn-sm btn-outline btn-duration" data-days="3">3 zile</button>
+              <button type="button" class="btn btn-sm btn-outline btn-duration" data-days="7">7 zile</button>
+              <button type="button" class="btn btn-sm btn-outline btn-duration" data-days="14">14 zile</button>
+              <button type="button" class="btn btn-sm btn-outline btn-duration" data-days="30">30 zile</button>
+            </div>
+            <div class="rental-calculator">
+              <div class="calc-row">
+                <span>Preț pe zi:</span>
+                <span id="calc-day-price">0 RON</span>
+              </div>
+              <div class="calc-row">
+                <span>Durată împrumut:</span>
+                <span id="calc-days">0 zile</span>
+              </div>
+              <hr class="calc-divider">
+              <div class="calc-row total">
+                <span>Total calculat:</span>
+                <span id="calc-total">0 RON</span>
+              </div>
+            </div>
+            <button id="btn-confirm-rent" class="btn btn-primary btn-block">Înregistrează împrumutul</button>
+            <button id="btn-delete-tool-modal" class="btn btn-danger btn-block" style="margin-top: 10px;">🗑️ Șterge Utilajul din Magazie</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Deposit Modal -->
+    <div id="modal-deposit" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">Alimentează soldul</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-deposit-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="deposit-form">
+            <div class="form-group">
+              <label for="deposit-amount">Suma de alimentat (RON)</label>
+              <input type="number" id="deposit-amount" min="5" step="5" value="50" required>
+            </div>
+            <div class="quick-amounts">
+              <button type="button" class="btn btn-outline btn-sm quick-amount-btn" data-value="20">20 RON</button>
+              <button type="button" class="btn btn-outline btn-sm quick-amount-btn" data-value="50">50 RON</button>
+              <button type="button" class="btn btn-outline btn-sm quick-amount-btn" data-value="100">100 RON</button>
+              <button type="button" class="btn btn-outline btn-sm quick-amount-btn" data-value="200">200 RON</button>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Alimentează soldul</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Add User / Installer Modal -->
+    <div id="modal-add-user" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">Adaugă Instalator Nou / Tehnician</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-add-user-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="add-user-form">
+            <div class="form-group">
+              <label for="new-username">Nume & Prenume Instalator *</label>
+              <input type="text" id="new-username" placeholder="Ex: Radu Popa (Instalator Electrice)" required>
+            </div>
+            <div class="form-group">
+              <label for="new-email">Email Contact *</label>
+              <input type="email" id="new-email" placeholder="Ex: radu@firma.ro" required>
+            </div>
+            <div class="form-group">
+              <label for="new-phone">📱 Telefon WhatsApp (Ex: 0721123456 sau 40721123456)</label>
+              <input type="tel" id="new-phone" placeholder="Ex: 0721123456 (Pentru emisiune WhatsApp automat)">
+            </div>
+            <div class="form-group" style="display: none;">
+              <input type="number" id="new-balance" value="0">
+              <input type="hidden" id="new-role" value="user">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 16px;">Adaugă Instalator în Registru</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Edit User Modal -->
+    <div id="modal-edit-user" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">Editează Utilizator</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-edit-user-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="edit-user-form">
+            <input type="hidden" id="edit-user-id">
+            <div class="form-group">
+              <label for="edit-username">Nume Utilizator *</label>
+              <input type="text" id="edit-username" placeholder="Ex: Radu Popa" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-email">Email *</label>
+              <input type="email" id="edit-email" placeholder="Ex: radu@example.com" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-phone">📱 Telefon WhatsApp</label>
+              <input type="tel" id="edit-phone" placeholder="Ex: 0721123456">
+            </div>
+            <div class="form-group">
+              <label for="edit-balance">Sold (RON)</label>
+              <input type="number" id="edit-balance" min="0" step="5" required>
+            </div>
+            <div class="form-group">
+              <label for="edit-role">Rol Utilizator</label>
+              <select id="edit-role" class="custom-select">
+                <option value="user">Utilizator Obișnuit</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 16px;">Salvează Modificările</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Extend Rental Modal -->
+    <div id="modal-extend-rental" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">Prelungește Perioada Împrumutului</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-extend-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="extend-rental-form">
+            <input type="hidden" id="extend-rental-id">
+            <input type="hidden" id="extend-daily-price">
+
+            <div class="form-group">
+              <label>Data curentă de returnare</label>
+              <input type="text" id="extend-current-end" readonly style="opacity: 0.7;">
+            </div>
+            <div class="form-group">
+              <label for="extend-new-end">Noua dată de returnare *</label>
+              <input type="date" id="extend-new-end" required>
+            </div>
+
+            <div class="rent-calc-box" style="margin-top: 12px;">
+              <div class="calc-row">
+                <span>Zile suplimentare:</span>
+                <span id="extend-calc-days" style="font-weight: 600;">0 zile</span>
+              </div>
+              <div class="calc-row total-row">
+                <span>Cost suplimentar:</span>
+                <span id="extend-calc-total" class="total-val">0 RON</span>
+              </div>
+            </div>
+
+            <button type="submit" id="btn-confirm-extend" class="btn btn-primary btn-block" style="margin-top: 16px;">Confirmă Prelungirea</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Printable Contract / Proces-Verbal Modal -->
+    <div id="modal-contract" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper modal-md" style="max-width: 650px;">
+        <div class="modal-header" style="border-bottom: 1px solid var(--border);">
+          <h3 class="modal-title">Proces-Verbal de Predare-Primire</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-contract-close">&times;</button>
+        </div>
+        <div class="modal-body" id="contract-print-area" style="padding: 24px; font-family: sans-serif; color: #0f172a; background: #ffffff; border-radius: 8px;">
+          <!-- Contract content rendered dynamically -->
+        </div>
+        <div class="modal-footer" style="padding: 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 12px;">
+          <button class="btn btn-outline" id="btn-close-contract">Închide</button>
+          <button class="btn btn-primary" id="btn-print-contract">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px; margin-right:6px;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Imprimă / Salvează PDF
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Backup & Restore Modal -->
+    <div id="modal-backup" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper modal-sm">
+        <div class="modal-header">
+          <h3 class="modal-title">💾 Salvare & Backup Date pe Calculator</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-backup-close">&times;</button>
+        </div>
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="padding: 16px; background: rgba(56, 189, 248, 0.05); border-color: var(--cyan);">
+            <h4 style="margin: 0 0 6px 0; color: var(--cyan);">1. Descarcă Backup în PC</h4>
+            <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--text-secondary);">Generează o copie de siguranță completă cu toate utilajele, predările și instalatorii tăi.</p>
+            <button id="btn-export-backup" class="btn btn-primary btn-block">📥 Descarcă Fișier Backup (JSON)</button>
+          </div>
+
+          <div class="card" style="padding: 16px; background: rgba(244, 63, 94, 0.05); border-color: var(--danger);">
+            <h4 style="margin: 0 0 6px 0; color: var(--danger);">2. Restabilește din Backup</h4>
+            <p style="margin: 0 0 12px 0; font-size: 13px; color: var(--text-secondary);">Încarcă un fișier backup salvat anterior pentru a restaura datele pe acest PC.</p>
+            <input type="file" id="import-backup-file" accept=".json" style="display: none;">
+            <button id="btn-import-backup-trigger" class="btn btn-outline btn-block" style="border-color: var(--danger); color: var(--danger);">📤 Încarcă & Restabilește Backup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. Categories Manager Modal -->
+    <div id="modal-categories" class="modal">
+      <div class="modal-backdrop" onclick="closeAllModals()"></div>
+      <div class="modal-wrapper modal-md" style="max-width: 620px;">
+        <div class="modal-header">
+          <h3 class="modal-title">🗂️ Gestiune Categorii Scule & Utilaje</h3>
+          <button class="btn-close-modal" onclick="closeAllModals()" id="md-categories-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="add-category-form" style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <input type="text" id="new-cat-name" placeholder="Denumire categorie nouă (ex: Scule Sudură, Sanitare...)" required style="flex: 1;">
+            <select id="new-cat-icon" class="custom-select" style="width: 160px;">
+              <option value="/images/default.svg">🧰 Standard</option>
+              <option value="/images/drill.svg">🔨 Bormașină</option>
+              <option value="/images/lawnmower.svg">🚜 Grădină</option>
+              <option value="/images/grinder.svg">🪚 Flex</option>
+              <option value="/images/toolbox.svg">🧰 Chei</option>
+              <option value="/images/washer.svg">💦 Presiune</option>
+              <option value="/images/generator.svg">⚡ Generator</option>
+              <option value="/images/screwdriver.svg">🪛 Șurubelniță</option>
+              <option value="/images/laser.svg">📐 Laser</option>
+            </select>
+            <button type="submit" class="btn btn-primary" style="white-space: nowrap;">+ Adaugă</button>
+          </form>
+
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Icoană</th>
+                  <th>Denumire Categorie</th>
+                  <th>Utilaje Alocate</th>
+                  <th>Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody id="categories-table-body">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast Notification System -->
+    <div id="toast-container" class="toast-container"></div>
+    
+  </div>
+
+  <!-- Custom JavaScript -->
+  <script src="/app.js?v=15"></script>
+</body>
+</html>
