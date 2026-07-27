@@ -1081,10 +1081,11 @@ async function openContractModal(rentalId) {
     const c = await res.json();
 
     const todayStr = new Date().toLocaleDateString('ro-RO');
+    const maxEndDate = c.items.reduce((max, item) => item.end_date > max ? item.end_date : max, c.start_date);
 
     contractPrintArea.innerHTML = `
       <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0f172a; padding-bottom: 12px;">
-        <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a;">PROCES-VERBAL DE PREDARE-PRIMIRE SCULĂ</h2>
+        <h2 style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; color: #0f172a;">PROCES-VERBAL DE PREDARE-PRIMIRE ECHIPAMENTE</h2>
         <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Nr. Înregistrare: #${c.id} | Data eliberării: ${todayStr}</p>
       </div>
 
@@ -1112,17 +1113,23 @@ async function openContractModal(rentalId) {
           </tr>
         </thead>
         <tbody>
-          <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 8px 6px; font-weight: 600;">${c.tool_name}</td>
-            <td style="padding: 8px 6px;">${c.tool_category}</td>
-            <td style="padding: 8px 6px;">${c.start_date} &rarr; ${c.end_date}</td>
-            <td style="padding: 8px 6px; text-align: right; font-weight: 700;">${formatCurrency(c.total_price)}</td>
+          ${c.items.map(item => `
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+              <td style="padding: 8px 6px; font-weight: 600;">${item.tool_name}</td>
+              <td style="padding: 8px 6px;">${item.tool_category}</td>
+              <td style="padding: 8px 6px;">${c.start_date} &rarr; ${item.end_date}</td>
+              <td style="padding: 8px 6px; text-align: right; font-weight: 700;">${formatCurrency(item.total_price)}</td>
+            </tr>
+          `).join('')}
+          <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e1;">
+            <td colspan="3" style="padding: 8px 6px; text-align: right;">TOTAL GENERAL CONTRACT:</td>
+            <td style="padding: 8px 6px; text-align: right; font-weight: 800; color: #007aff;">${formatCurrency(c.total_contract_price)}</td>
           </tr>
         </tbody>
       </table>
 
       <div style="font-size: 12px; color: #475569; margin-bottom: 24px; line-height: 1.4; background: #fffbeb; border: 1px solid #fef3c7; padding: 8px; border-radius: 6px;">
-        Primitorul declară că a preluat unealta în stare bună de funcționare și se obligă să o restituie la data de <strong>${c.end_date}</strong>.
+        Primitorul declară că a preluat echipamentele de mai sus în stare bună de funcționare și se obligă să le restituie cel târziu la data de <strong>${maxEndDate}</strong>.
       </div>
 
       <div style="display: flex; justify-content: space-between; margin-top: 30px; font-size: 12px;">
