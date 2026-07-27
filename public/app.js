@@ -1760,9 +1760,13 @@ function setupEventListeners() {
     }, 500));
   }
 
-  document.getElementById('logo-home').addEventListener('click', () => {
-    document.getElementById('tab-btn-dashboard').click();
-  });
+  const logoHome = document.getElementById('logo-home');
+  if (logoHome) {
+    logoHome.addEventListener('click', () => {
+      const tabBtn = document.getElementById('tab-btn-dashboard');
+      if (tabBtn) tabBtn.click();
+    });
+  }
 
   if (userSelect) {
     userSelect.addEventListener('change', (e) => {
@@ -1974,25 +1978,29 @@ function setupPwaInstallPrompt() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    pwaInstallBanner.classList.remove('hidden');
+    if (pwaInstallBanner) pwaInstallBanner.classList.remove('hidden');
   });
 
-  btnPwaInstall.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to install prompt: ${outcome}`);
-    deferredPrompt = null;
-    pwaInstallBanner.classList.add('hidden');
-  });
+  if (btnPwaInstall) {
+    btnPwaInstall.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to install prompt: ${outcome}`);
+      deferredPrompt = null;
+      if (pwaInstallBanner) pwaInstallBanner.classList.add('hidden');
+    });
+  }
 
-  btnPwaClose.addEventListener('click', () => {
-    pwaInstallBanner.classList.add('hidden');
-  });
+  if (btnPwaClose) {
+    btnPwaClose.addEventListener('click', () => {
+      if (pwaInstallBanner) pwaInstallBanner.classList.add('hidden');
+    });
+  }
 
   window.addEventListener('appinstalled', (evt) => {
     showToast('Aplicația ToolShare a fost instalată cu succes!', 'success');
-    pwaInstallBanner.classList.add('hidden');
+    if (pwaInstallBanner) pwaInstallBanner.classList.add('hidden');
   });
 }
 
@@ -2143,5 +2151,8 @@ async function batchRent() {
 }
 
 // Wire up batch bar buttons
-document.getElementById('btn-batch-rent').addEventListener('click', batchRent);
-document.getElementById('btn-batch-cancel').addEventListener('click', clearBatchSelection);
+const btnBatchRent = document.getElementById('btn-batch-rent');
+if (btnBatchRent) btnBatchRent.addEventListener('click', batchRent);
+
+const btnBatchCancel = document.getElementById('btn-batch-cancel');
+if (btnBatchCancel) btnBatchCancel.addEventListener('click', clearBatchSelection);
