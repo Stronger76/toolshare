@@ -1,9 +1,10 @@
-const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const { Pool } = require('pg');
 
 const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 const isPostgres = !!dbUrl;
+
+let db;
 
 if (isPostgres) {
   console.log('Connecting to PostgreSQL database using Vercel integration url...');
@@ -106,6 +107,7 @@ if (isPostgres) {
 
   initializePostgresDatabase();
 } else {
+  const sqlite3 = require('sqlite3').verbose();
   const dbPath = path.join(__dirname, 'toolshare.db');
   const sqliteDb = new sqlite3.Database(dbPath, (err) => {
     if (err) {
