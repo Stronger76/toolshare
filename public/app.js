@@ -17,8 +17,50 @@ let users = [];
 let currentUser = null;
 let currentTools = [];
 let selectedTool = null;
-let deferredPrompt = null; // For PWA installation
 let selectedToolIds = new Set(); // For batch selection
+
+// Utility to group rentals by renter and start date
+function groupRentals(rentalList) {
+  const groups = {};
+  rentalList.forEach(r => {
+    const key = `${r.renter_id}_${r.start_date}`;
+    if (!groups[key]) {
+      groups[key] = {
+        id: r.id, // primary id for pdf (can be the first tool's id)
+        renter_name: r.renter_name,
+        owner_name: r.owner_name,
+        start_date: r.start_date,
+        end_date: r.end_date,
+        status: 'returned',
+        total_price: 0,
+        tools: [],
+        tool_names: []
+      };
+    }
+    groups[key].tools.push(r);
+    groups[key].tool_names.push(r.tool_name);
+    groups[key].total_price += r.total_price;
+    if (r.status === 'active') {
+      groups[key].status = 'active';
+    }
+    if (new Date(r.end_date) > new Date(groups[key].end_date)) {
+      groups[key].end_date = r.end_date;
+    }
+  });
+
+  return Object.values(groups).map(g => {
+    if (g.tools.length === 1) {
+      g.display_name = g.tool_names[0];
+      g.image_url = g.tools[0].image_url;
+      g.tool_name = g.tool_names[0]; // for compatibility
+    } else {
+      g.display_name = `${g.tools.length} utilaje (${g.tool_names.join(', ')})`;
+      g.image_url = g.tools[0].image_url;
+      g.tool_name = g.display_name;
+    }
+    return g;
+  }).sort((a, b) => b.id - a.id);
+}
 
 // DOM Elements
 const userSelect = document.getElementById('user-select');
@@ -539,7 +581,9 @@ function renderProfileDashboard(userData) {
   if (userData.rentals.length === 0) {
     rentalsList.innerHTML = '<p class="empty-text">Nu ai niciun împrumut înregistrat.</p>';
   } else {
-    userData.rentals.forEach(rental => {
+    const groupedRentals = groupRentals(userData.rentals);
+
+    groupedRentals.forEach(rental => {
       const item = document.createElement('div');
       item.className = 'profile-item';
       
@@ -548,18 +592,20 @@ function renderProfileDashboard(userData) {
         ? `<span class="badge badge-accent">Activ (Returnare: ${rental.end_date})</span>`
         : `<span class="badge" style="background-color: rgba(255,255,255,0.05); color: var(--text-muted)">Returnată</span>`;
       
+      const activeToolIds = rental.tools.filter(t => t.status === 'active').map(t => t.id).join(',');
+
       const actionButtons = `
         <button class="btn btn-sm btn-outline btn-contract" data-rental-id="${rental.id}">Proces-Verbal (PDF)</button>
         ${isActive ? `
-          <button class="btn btn-sm btn-outline btn-extend" data-rental-id="${rental.id}" data-end="${rental.end_date}">Prelungește</button>
+          <button class="btn btn-sm btn-outline btn-extend" data-ids="${activeToolIds}" data-end="${rental.end_date}">Prelungește</button>
           <button class="btn btn-sm btn-primary btn-return" data-rental-id="${rental.id}">Returnează</button>
         ` : ''}
       `;
 
       item.innerHTML = `
-        <img class="profile-item-img" src="${rental.image_url}" alt="${rental.tool_name}">
+        <img class="profile-item-img" src="${rental.image_url}" alt="${rental.display_name}">
         <div class="profile-item-details">
-          <div class="profile-item-name">${rental.tool_name}</div>
+          <div class="profile-item-name">${rental.display_name}</div>
           <div class="profile-item-meta">Proprietar: ${rental.owner_name} | Perioadă: <span>${rental.start_date} -> ${rental.end_date}</span> | ${statusBadge}</div>
         </div>
         <div>
@@ -573,8 +619,9 @@ function renderProfileDashboard(userData) {
       });
 
       if (isActive) {
-        item.querySelector('.btn-extend').addEventListener('click', () => {
-          openExtendModal(rental.id, rental.end_date);
+        item.querySelector('.btn-extend').addEventListener('click', (e) => {
+          const ids = e.target.getAttribute('data-ids');
+          openExtendModal(ids, rental.end_date);
         });
 
         item.querySelector('.btn-return').addEventListener('click', async (e) => {
@@ -583,13 +630,13 @@ function renderProfileDashboard(userData) {
           btn.textContent = 'Se returnează...';
           
           try {
-            const res = await fetch(`/api/rentals/${rental.id}/return`, { method: 'POST' });
-            if (!res.ok) throw new Error();
-            showToast('Unealta a fost înregistrată ca returnată!', 'success');
+            const activeTools = rental.tools.filter(t => t.status === 'active');
+            await Promise.all(activeTools.map(t => fetch(`/api/rentals/${t.id}/return`, { method: 'POST' })));
+            showToast('Utilaj(ele) returnat(e) cu succes!', 'success');
             await selectUser(currentUser.id);
             await loadTools();
           } catch (err) {
-            showToast('Eroare la returnarea uneltei.', 'error');
+            showToast('Eroare la returnare.', 'error');
             btn.disabled = false;
             btn.textContent = 'Returnează';
           }
@@ -732,7 +779,9 @@ function renderAdminRentals(rentalList) {
     return;
   }
 
-  rentalList.forEach(r => {
+  const groupedRentals = groupRentals(rentalList);
+
+  groupedRentals.forEach(r => {
     const tr = document.createElement('tr');
     const isActive = r.status === 'active';
     
@@ -740,12 +789,15 @@ function renderAdminRentals(rentalList) {
       ? `<span class="badge badge-accent">Împrumut Activ</span>`
       : `<span class="badge" style="background-color: rgba(255,255,255,0.05); color: var(--text-muted)">Returnată</span>`;
     
+    // Convert active tools in group to comma-separated list for extend modal
+    const activeToolIds = r.tools.filter(t => t.status === 'active').map(t => t.id).join(',');
+
     const actionBtns = `
       <div style="display: flex; gap: 4px; flex-wrap: wrap;">
         <button class="btn btn-sm btn-outline btn-admin-contract" data-id="${r.id}" title="Descarcă Proces-Verbal PDF">PDF</button>
         ${isActive ? `
           <button class="btn btn-sm btn-quick-return btn-admin-quick-return" data-id="${r.id}" title="Returnare rapidă">✅ Visszavettem</button>
-          <button class="btn btn-sm btn-outline btn-admin-extend" data-id="${r.id}" data-end="${r.end_date}">Prelungește</button>
+          <button class="btn btn-sm btn-outline btn-admin-extend" data-ids="${activeToolIds}" data-end="${r.end_date}">Prelungește</button>
           <button class="btn btn-sm btn-danger btn-admin-cancel" data-id="${r.id}">Forțează</button>
         ` : ''}
       </div>
@@ -753,7 +805,7 @@ function renderAdminRentals(rentalList) {
 
     tr.innerHTML = `
       <td>#${r.id}</td>
-      <td style="font-weight: 600; color: var(--text-primary);">${r.tool_name}</td>
+      <td style="font-weight: 600; color: var(--text-primary);">${r.display_name}</td>
       <td style="color: var(--cyan); font-weight: 600;">${r.renter_name}</td>
       <td>${r.owner_name}</td>
       <td>${r.start_date}</td>
@@ -767,15 +819,19 @@ function renderAdminRentals(rentalList) {
     });
 
     if (isActive) {
-      // Quick Return — no confirmation, instant action
+      // Quick Return — no confirmation, instant action (batch)
       tr.querySelector('.btn-admin-quick-return').addEventListener('click', async (e) => {
         const btn = e.target;
         btn.disabled = true;
         btn.textContent = '⏳...';
         try {
-          const res = await fetch(`/api/admin/rentals/${r.id}/cancel`, { method: 'POST' });
-          if (!res.ok) throw new Error();
-          showToast(`✅ „${r.tool_name}" visszavéve (${r.renter_name})`, 'success');
+          const activeTools = r.tools.filter(t => t.status === 'active');
+          await Promise.all(activeTools.map(t => 
+            fetch(`/api/admin/rentals/${t.id}/cancel`, { method: 'POST' }).then(res => {
+              if (!res.ok) throw new Error();
+            })
+          ));
+          showToast(`✅ „${r.display_name}" visszavéve (${r.renter_name})`, 'success');
           await loadAdminPanelData();
           await loadTools();
         } catch (err) {
@@ -785,18 +841,20 @@ function renderAdminRentals(rentalList) {
         }
       });
 
-      tr.querySelector('.btn-admin-extend').addEventListener('click', () => {
-        openExtendModal(r.id, r.end_date);
+      tr.querySelector('.btn-admin-extend').addEventListener('click', (e) => {
+        const ids = e.target.getAttribute('data-ids');
+        openExtendModal(ids, r.end_date); // we pass comma-separated ids now
       });
 
+      // Force Return (batch)
       tr.querySelector('.btn-admin-cancel').addEventListener('click', async () => {
-        if (!confirm(`Sigur dorești să forțezi înregistrarea ca returnată a uneltei "${r.tool_name}" împrumutată de ${r.renter_name}?`)) return;
+        if (!confirm(`Sigur dorești să forțezi înregistrarea ca returnată pentru:\n${r.display_name}\nîmprumutat(e) de ${r.renter_name}?`)) return;
         
         try {
-          const res = await fetch(`/api/admin/rentals/${r.id}/cancel`, { method: 'POST' });
-          if (!res.ok) throw new Error();
+          const activeTools = r.tools.filter(t => t.status === 'active');
+          await Promise.all(activeTools.map(t => fetch(`/api/admin/rentals/${t.id}/cancel`, { method: 'POST' })));
           
-          showToast('Unealtă marcată ca returnată de Admin.', 'success');
+          showToast('Utilaj(ele) marcate ca returnate de Admin.', 'success');
           await loadAdminPanelData();
           await loadTools();
         } catch (err) {
@@ -1017,14 +1075,20 @@ editUserForm.addEventListener('submit', async (e) => {
 });
 
 // Open Extend Rental Modal
-async function openExtendModal(rentalId, currentEndDate) {
+async function openExtendModal(rentalIdsStr, currentEndDate) {
   try {
-    const res = await fetch(`/api/rentals/${rentalId}/contract`);
+    const firstId = rentalIdsStr.toString().split(',')[0];
+    const res = await fetch(`/api/rentals/${firstId}/contract`);
     if (!res.ok) throw new Error();
     const data = await res.json();
 
-    extendRentalIdInput.value = rentalId;
-    extendDailyPriceInput.value = data.daily_price;
+    // Sum of daily prices for all active tools in this group
+    const activeItems = data.items.filter(i => rentalIdsStr.includes(i.rental_id.toString()));
+    const totalDailyPrice = activeItems.reduce((sum, item) => sum + item.daily_price, 0);
+
+    window.currentExtendItems = activeItems;
+    extendRentalIdInput.value = rentalIdsStr;
+    extendDailyPriceInput.value = totalDailyPrice;
     extendCurrentEndInput.value = currentEndDate;
 
     const curEnd = new Date(currentEndDate);
@@ -1069,39 +1133,41 @@ extendNewEndInput.addEventListener('change', calculateExtendCost);
 extendRentalForm.addEventListener('submit', async (e) => {
   e.preventDefault();
 
-  const rentalId = extendRentalIdInput.value;
   const new_end_date = extendNewEndInput.value;
   const currentEnd = new Date(extendCurrentEndInput.value);
   const newEnd = new Date(new_end_date);
-  const dailyPrice = parseFloat(extendDailyPriceInput.value) || 0;
-
+  
   const diffTime = Math.abs(newEnd - currentEnd);
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  const additional_price = diffDays * dailyPrice;
 
   btnConfirmExtend.disabled = true;
   btnConfirmExtend.textContent = 'Se prelungeste...';
 
   try {
-    const res = await fetch(`/api/rentals/${rentalId}/extend`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ new_end_date, additional_price })
-    });
+    if (window.currentExtendItems && window.currentExtendItems.length > 0) {
+      await Promise.all(window.currentExtendItems.map(item => {
+        const itemAdditionalPrice = diffDays * item.daily_price;
+        return fetch(`/api/rentals/${item.rental_id}/extend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ new_end_date, additional_price: itemAdditionalPrice })
+        }).then(res => {
+          if (!res.ok) throw new Error();
+        });
+      }));
+    }
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
-    showToast(data.message, 'success');
+    showToast('Împrumut(uri) prelungit(e) cu succes!', 'success');
     closeAllModals();
 
     if (currentUser) await selectUser(currentUser.id);
-    await loadAdminPanelData();
+    await loadTools();
+    if (typeof loadAdminPanelData === 'function') await loadAdminPanelData();
   } catch (err) {
-    showToast(err.message || 'Eroare la prelungirea împrumutului.', 'error');
+    showToast('Eroare la prelungirea împrumutului.', 'error');
   } finally {
     btnConfirmExtend.disabled = false;
-    btnConfirmExtend.textContent = 'Confirmă Prelungirea';
+    btnConfirmExtend.textContent = 'Salvează Prelungirea';
   }
 });
 
